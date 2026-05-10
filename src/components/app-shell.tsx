@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "motion/react";
+import { SplashScreen } from "@/components/splash-screen";
 import {
   LayoutDashboard,
   Receipt,
@@ -73,6 +74,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const ready = !sLoading && !pLoading && !hLoading;
 
+  // Show the splash for a minimum duration on cold start so it actually
+  // gets seen — feels purposeful instead of a flash.
+  const [splashDone, setSplashDone] = React.useState(false);
+  React.useEffect(() => {
+    const t = setTimeout(() => setSplashDone(true), 1100);
+    return () => clearTimeout(t);
+  }, []);
+  const showSplash = !ready || !splashDone;
+
   React.useEffect(() => {
     if (!ready) return;
     if (!session) return;
@@ -81,17 +91,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [ready, session, profile, pathname, router]);
 
-  // close drawer on route change
   React.useEffect(() => {
     setDrawerOpen(false);
   }, [pathname]);
 
-  if (!ready) {
-    return (
-      <div className="min-h-screen grid place-items-center">
-        <div className="h-10 w-10 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
-      </div>
-    );
+  if (showSplash) {
+    return <SplashScreen show />;
   }
 
   if (!profile?.household_id) {

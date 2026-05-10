@@ -9,7 +9,8 @@ import { PageHeader } from "@/components/page-header";
 import { KpiCard } from "@/components/kpi-card";
 import { TransactionRow } from "@/components/transaction-row";
 import { CategoryPie } from "@/components/charts";
-import { PageMotion, FadeIn, StaggerChildren, StaggerItem } from "@/components/motion";
+import { PageMotion, FadeIn, StaggerChildren, StaggerItem, AnimatedCurrency } from "@/components/motion";
+import { motion } from "motion/react";
 import { useTransactions } from "@/lib/hooks/use-data";
 import { useCategories } from "@/lib/hooks/use-data";
 import { useHousehold } from "@/lib/hooks/use-household";
@@ -22,7 +23,7 @@ import {
   topCategories,
 } from "@/lib/analytics";
 import { formatCurrency, isoDate, pct, startOfMonth } from "@/lib/utils";
-import { ArrowRight, AlertTriangle, Plus, Users, Sparkles, Tag } from "lucide-react";
+import { ArrowRight, AlertTriangle, Plus, Users, Sparkles, PieChart } from "lucide-react";
 import { useHouseholdMembers } from "@/lib/hooks/use-household";
 import { toast } from "sonner";
 
@@ -76,27 +77,76 @@ export default function OverviewPage() {
 
   return (
     <PageMotion className="container max-w-6xl py-4 md:py-8 space-y-5">
-      {/* Animated hero gradient ribbon */}
-      <div className="relative -mx-4 md:-mx-6 mb-2 md:mb-4 px-4 md:px-6 pt-1">
-        <div className="absolute inset-0 -z-10 overflow-hidden">
-          <div className="absolute -top-24 left-1/4 h-72 w-72 rounded-full bg-primary/15 blur-3xl animate-pulse" />
-          <div className="absolute -top-16 right-10 h-56 w-56 rounded-full bg-emerald-500/10 blur-3xl" />
+      {/* Hero: greeting + giant animated net number with floating orbs */}
+      <div className="relative -mx-4 md:-mx-6 px-4 md:px-6 pt-2 pb-2 mb-1 overflow-hidden rounded-2xl">
+        <div className="absolute inset-0 -z-10">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.7, x: -40 }}
+            animate={{ opacity: 1, scale: 1, x: 0 }}
+            transition={{ duration: 1.4, ease: "easeOut" }}
+            className="absolute -top-24 left-[10%] h-72 w-72 rounded-full bg-primary/25 blur-3xl"
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.7, x: 40 }}
+            animate={{ opacity: 1, scale: 1, x: 0 }}
+            transition={{ duration: 1.4, ease: "easeOut", delay: 0.1 }}
+            className="absolute -top-12 right-[5%] h-64 w-64 rounded-full bg-emerald-400/20 blur-3xl"
+          />
+          <motion.div
+            animate={{ opacity: [0.4, 0.7, 0.4] }}
+            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute top-10 right-1/3 h-40 w-40 rounded-full bg-cyan-400/15 blur-3xl"
+          />
+          <div
+            className="absolute inset-0 opacity-[0.04]"
+            style={{
+              backgroundImage:
+                "linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)",
+              backgroundSize: "32px 32px",
+              maskImage: "radial-gradient(ellipse at center, black 20%, transparent 70%)",
+              WebkitMaskImage: "radial-gradient(ellipse at center, black 20%, transparent 70%)",
+            }}
+          />
         </div>
-        <PageHeader
-          title={
-            <>
-              {greeting()}, <span className="gradient-text-primary">welcome back.</span>
-            </>
-          }
-          description={`Here's your ${monthLabel} so far.`}
-          actions={
-            <Button asChild className="hidden md:inline-flex" size="lg">
-              <Link href="/add">
-                <Plus /> Add transaction
-              </Link>
-            </Button>
-          }
-        />
+
+        <div className="grid md:grid-cols-2 gap-4 items-end">
+          <div>
+            <PageHeader
+              className="mb-2"
+              title={
+                <>
+                  {greeting()},
+                  <br className="md:hidden" />
+                  <span className="gradient-text-primary"> welcome back.</span>
+                </>
+              }
+              description={monthLabel}
+              actions={
+                <Button asChild className="hidden md:inline-flex" size="lg">
+                  <Link href="/add">
+                    <Plus /> Add transaction
+                  </Link>
+                </Button>
+              }
+            />
+          </div>
+          <FadeIn delay={0.2} className="md:text-right">
+            <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground font-medium mb-0.5">
+              Net saved this month
+            </div>
+            <div
+              className={
+                "text-4xl md:text-6xl font-bold tabular-nums tracking-tight " +
+                (net >= 0 ? "gradient-text-primary" : "text-destructive")
+              }
+            >
+              <AnimatedCurrency value={Math.max(0, net)} currency={currency} locale={locale} />
+            </div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              {savingsRate}% savings rate · {formatCurrency(curSums.income, currency, locale)} earned
+            </div>
+          </FadeIn>
+        </div>
       </div>
 
       {isFirstRun && (
@@ -131,11 +181,11 @@ export default function OverviewPage() {
                 num={2}
                 done={false}
                 title="Set monthly budgets"
-                description="Optional — gives you progress bars and over-budget alerts."
+                description="Optional — tap any category in Budgets to set a limit. Get progress bars and alerts."
                 action={
                   <Button asChild size="sm" variant="outline">
-                    <Link href="/categories">
-                      <Tag className="h-4 w-4" /> Categories
+                    <Link href="/budgets">
+                      <PieChart className="h-4 w-4" /> Budgets
                     </Link>
                   </Button>
                 }
