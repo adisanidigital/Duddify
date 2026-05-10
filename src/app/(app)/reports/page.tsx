@@ -227,7 +227,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Detailed category table */}
-      <Card>
+      <Card className="print-allow-break">
         <CardHeader>
           <CardTitle>Detailed expense breakdown</CardTitle>
           <CardDescription>Sorted by amount, with % of total and avg per transaction</CardDescription>
@@ -398,7 +398,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Per-member detail (always shown, even with 1 member, for transparency) */}
-      <Card className="print:break-inside-avoid">
+      <Card className="print-allow-break">
         <CardHeader>
           <CardTitle>Member breakdown</CardTitle>
           <CardDescription>
@@ -442,7 +442,7 @@ export default function ReportsPage() {
       </Card>
 
       {/* Top transactions */}
-      <Card>
+      <Card className="print-allow-break">
         <CardHeader>
           <CardTitle>Biggest expenses</CardTitle>
           <CardDescription>Top 10 single transactions in this range</CardDescription>
