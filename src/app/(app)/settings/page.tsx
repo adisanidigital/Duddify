@@ -15,7 +15,11 @@ import { whoOwesWhom } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Copy, Download, LogOut, Pencil, Check, X, UserMinus, DoorOpen } from "lucide-react";
+import { Copy, Download, LogOut, Pencil, Check, X, UserMinus, DoorOpen, Palette, Sun, Moon, Monitor } from "lucide-react";
+import { useColorTheme } from "@/components/color-theme";
+import { COLOR_THEMES } from "@/lib/color-themes";
+import { useTheme } from "next-themes";
+import { cn } from "@/lib/utils";
 import { formatCurrency, isoDate } from "@/lib/utils";
 import { PageMotion } from "@/components/motion";
 
@@ -438,6 +442,8 @@ export default function SettingsPage() {
         </Card>
       )}
 
+      <AppearanceCard />
+
       <Card>
         <CardHeader>
           <CardTitle>Data</CardTitle>
@@ -453,5 +459,101 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
     </PageMotion>
+  );
+}
+
+function AppearanceCard() {
+  const { theme: colorTheme, setTheme: setColorTheme } = useColorTheme();
+  const { theme: mode, setTheme: setMode, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Palette className="h-4 w-4" /> Appearance
+        </CardTitle>
+        <CardDescription>Pick a color theme and light/dark mode</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {/* Mode */}
+        <div>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+            Mode
+          </Label>
+          <div className="grid grid-cols-3 gap-2 mt-2">
+            {[
+              { id: "light", label: "Light", icon: Sun },
+              { id: "system", label: "System", icon: Monitor },
+              { id: "dark", label: "Dark", icon: Moon },
+            ].map((m) => {
+              const active = mounted && mode === m.id;
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => setMode(m.id)}
+                  className={cn(
+                    "flex items-center justify-center gap-2 h-10 rounded-lg border transition-all text-sm",
+                    active
+                      ? "border-primary bg-primary/10 text-primary font-medium"
+                      : "border-border hover:bg-accent"
+                  )}
+                >
+                  <m.icon className="h-4 w-4" />
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Color theme */}
+        <div>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+            Color theme
+          </Label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+            {COLOR_THEMES.map((t) => {
+              const active = mounted && colorTheme === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setColorTheme(t.id)}
+                  className={cn(
+                    "group flex items-center gap-3 p-3 rounded-lg border text-left transition-all",
+                    active
+                      ? "border-primary ring-1 ring-primary/40 bg-primary/5"
+                      : "border-border hover:bg-accent"
+                  )}
+                >
+                  <div className="flex -space-x-1.5 shrink-0">
+                    {t.swatch.map((c, i) => (
+                      <span
+                        key={i}
+                        className="h-5 w-5 rounded-full border-2 border-background"
+                        style={{ background: c }}
+                      />
+                    ))}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium leading-tight flex items-center gap-1.5">
+                      {t.name}
+                      {active && <Check className="h-3 w-3 text-primary" />}
+                    </div>
+                    <div className="text-[10.5px] text-muted-foreground truncate leading-tight">
+                      {t.description}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-2">
+            Theme is per-device. Reflects throughout the app and in PDF exports.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

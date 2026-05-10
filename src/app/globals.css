@@ -10,6 +10,7 @@
     --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
+    /* Default theme: Emerald (overridden by [data-color-theme] below) */
     --primary: 158 79% 42%;
     --primary-foreground: 144 80% 10%;
     --primary-glow: 158 79% 50%;
@@ -38,6 +39,7 @@
     --card-foreground: 0 0% 98%;
     --popover: 240 10% 8%;
     --popover-foreground: 0 0% 98%;
+    /* Default dark theme: Emerald (overridden by [data-color-theme] below) */
     --primary: 158 75% 50%;
     --primary-foreground: 144 80% 8%;
     --primary-glow: 158 80% 55%;
@@ -56,6 +58,107 @@
     --border: 240 4% 17%;
     --input: 240 4% 18%;
     --ring: 158 80% 55%;
+  }
+
+  /* =====================================================================
+     COLOR THEME OVERRIDES
+     Applied via [data-color-theme="..."] on <html>.
+     Each theme overrides --primary, --primary-glow, --ring, --success
+     for both light and dark variants.
+     ===================================================================== */
+
+  /* Emerald (default — explicit for clarity) */
+  [data-color-theme="emerald"] {
+    --primary: 158 79% 42%;
+    --primary-glow: 158 79% 50%;
+    --ring: 158 79% 50%;
+    --success: 158 79% 42%;
+  }
+  .dark[data-color-theme="emerald"] {
+    --primary: 158 75% 50%;
+    --primary-glow: 158 80% 55%;
+    --ring: 158 80% 55%;
+    --success: 158 75% 50%;
+  }
+
+  /* Ocean — blue */
+  [data-color-theme="ocean"] {
+    --primary: 217 83% 52%;
+    --primary-foreground: 217 100% 12%;
+    --primary-glow: 217 88% 60%;
+    --ring: 217 88% 60%;
+    --success: 158 79% 42%;
+  }
+  .dark[data-color-theme="ocean"] {
+    --primary: 217 88% 62%;
+    --primary-foreground: 217 100% 10%;
+    --primary-glow: 217 90% 70%;
+    --ring: 217 90% 70%;
+    --success: 158 75% 50%;
+  }
+
+  /* Sunset — orange */
+  [data-color-theme="sunset"] {
+    --primary: 22 92% 50%;
+    --primary-foreground: 22 100% 12%;
+    --primary-glow: 22 95% 58%;
+    --ring: 22 95% 58%;
+    --success: 158 79% 42%;
+  }
+  .dark[data-color-theme="sunset"] {
+    --primary: 22 95% 58%;
+    --primary-foreground: 22 100% 10%;
+    --primary-glow: 22 100% 65%;
+    --ring: 22 100% 65%;
+    --success: 158 75% 50%;
+  }
+
+  /* Midnight — purple */
+  [data-color-theme="midnight"] {
+    --primary: 262 78% 58%;
+    --primary-foreground: 262 100% 12%;
+    --primary-glow: 262 82% 66%;
+    --ring: 262 82% 66%;
+    --success: 158 79% 42%;
+  }
+  .dark[data-color-theme="midnight"] {
+    --primary: 262 82% 68%;
+    --primary-foreground: 262 100% 10%;
+    --primary-glow: 262 85% 75%;
+    --ring: 262 85% 75%;
+    --success: 158 75% 50%;
+  }
+
+  /* Rose — pink/red */
+  [data-color-theme="rose"] {
+    --primary: 346 77% 50%;
+    --primary-foreground: 346 100% 12%;
+    --primary-glow: 346 82% 58%;
+    --ring: 346 82% 58%;
+    --success: 158 79% 42%;
+  }
+  .dark[data-color-theme="rose"] {
+    --primary: 346 82% 62%;
+    --primary-foreground: 346 100% 10%;
+    --primary-glow: 346 85% 72%;
+    --ring: 346 85% 72%;
+    --success: 158 75% 50%;
+  }
+
+  /* Amber — gold */
+  [data-color-theme="amber"] {
+    --primary: 35 92% 47%;
+    --primary-foreground: 35 100% 10%;
+    --primary-glow: 35 95% 55%;
+    --ring: 35 95% 55%;
+    --success: 158 79% 42%;
+  }
+  .dark[data-color-theme="amber"] {
+    --primary: 35 95% 58%;
+    --primary-foreground: 35 100% 8%;
+    --primary-glow: 35 100% 68%;
+    --ring: 35 100% 68%;
+    --success: 158 75% 50%;
   }
 }
 

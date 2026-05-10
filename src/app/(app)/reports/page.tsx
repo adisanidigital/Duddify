@@ -334,8 +334,8 @@ export default function ReportsPage() {
       )}
 
       {/* Day of week & per-member */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 print:grid-cols-2">
-        <Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 print:grid-cols-2 print:gap-3">
+        <Card className="print:break-inside-avoid">
           <CardHeader>
             <CardTitle>Spend by day of week</CardTitle>
             <CardDescription>When your money tends to go out</CardDescription>
@@ -366,62 +366,80 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
 
-        {members.length >= 2 ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>By household member</CardTitle>
-              <CardDescription>Who paid for what (based on &ldquo;paid by&rdquo;)</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {byMember.map((m) => (
-                  <div key={m.id} className="rounded-lg border p-3">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="font-medium text-sm">{m.name}</div>
-                      <div className="text-xs text-muted-foreground">{m.count} entries</div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-xs">
-                      <div>
-                        <div className="text-muted-foreground">Spent</div>
-                        <div className="font-semibold tabular-nums text-destructive">
-                          {formatCurrency(m.expense, currency, locale)}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-muted-foreground">Income</div>
-                        <div className="font-semibold tabular-nums text-success">
-                          {formatCurrency(m.income, currency, locale)}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-muted-foreground">Invested</div>
-                        <div className="font-semibold tabular-nums text-primary">
-                          {formatCurrency(m.investment, currency, locale)}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+        <Card className="print:break-inside-avoid">
+          <CardHeader>
+            <CardTitle>{members.length >= 2 ? "Spending by member" : "Period summary"}</CardTitle>
+            <CardDescription>
+              {members.length >= 2
+                ? "Who paid for what (based on \u201Cpaid by\u201D)"
+                : rangeLabel}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {members.length >= 2 ? (
+              <MemberSpendingChart
+                rows={byMember}
+                currency={currency}
+                locale={locale}
+                totalSpent={totals.expense}
+              />
+            ) : (
+              <div className="text-sm space-y-2">
+                <Row label="Total income" value={formatCurrency(totals.income, currency, locale)} />
+                <Row label="Total spent" value={formatCurrency(totals.expense, currency, locale)} />
+                <Row label="Total invested" value={formatCurrency(totals.investment, currency, locale)} />
+                <Row label="Net saved" value={formatCurrency(net, currency, locale)} bold />
+                <Row label="Savings rate" value={`${savingsRate}%`} bold />
+                <Row label="Average daily spend" value={formatCurrency(avgPerDay, currency, locale)} />
               </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle>Period summary</CardTitle>
-              <CardDescription>{rangeLabel}</CardDescription>
-            </CardHeader>
-            <CardContent className="text-sm space-y-2">
-              <Row label="Total income" value={formatCurrency(totals.income, currency, locale)} />
-              <Row label="Total spent" value={formatCurrency(totals.expense, currency, locale)} />
-              <Row label="Total invested" value={formatCurrency(totals.investment, currency, locale)} />
-              <Row label="Net saved" value={formatCurrency(net, currency, locale)} bold />
-              <Row label="Savings rate" value={`${savingsRate}%`} bold />
-              <Row label="Average daily spend" value={formatCurrency(avgPerDay, currency, locale)} />
-            </CardContent>
-          </Card>
-        )}
+            )}
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Per-member detail (always shown, even with 1 member, for transparency) */}
+      <Card className="print:break-inside-avoid">
+        <CardHeader>
+          <CardTitle>Member breakdown</CardTitle>
+          <CardDescription>
+            Spend, income, and investments per person · expenses are grouped by &ldquo;paid by&rdquo;
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto -mx-2">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-muted-foreground text-left">
+                  <th className="px-2 py-2 font-medium">Member</th>
+                  <th className="px-2 py-2 font-medium text-right">Spent</th>
+                  <th className="px-2 py-2 font-medium text-right">Income</th>
+                  <th className="px-2 py-2 font-medium text-right">Invested</th>
+                  <th className="px-2 py-2 font-medium text-right">Entries</th>
+                </tr>
+              </thead>
+              <tbody>
+                {byMember.map((m) => (
+                  <tr key={m.id} className="border-t">
+                    <td className="px-2 py-2.5 font-medium">{m.name}</td>
+                    <td className="px-2 py-2.5 text-right tabular-nums text-destructive">
+                      {formatCurrency(m.expense, currency, locale)}
+                    </td>
+                    <td className="px-2 py-2.5 text-right tabular-nums text-success">
+                      {formatCurrency(m.income, currency, locale)}
+                    </td>
+                    <td className="px-2 py-2.5 text-right tabular-nums text-primary">
+                      {formatCurrency(m.investment, currency, locale)}
+                    </td>
+                    <td className="px-2 py-2.5 text-right tabular-nums text-muted-foreground">
+                      {m.count}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Top transactions */}
       <Card>
@@ -657,6 +675,88 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
     <div className={cn("flex justify-between py-1.5 border-b last:border-0", bold && "font-semibold")}>
       <span className="text-muted-foreground">{label}</span>
       <span className="tabular-nums">{value}</span>
+    </div>
+  );
+}
+
+const MEMBER_PALETTE = [
+  "hsl(158 75% 42%)",
+  "hsl(217 80% 55%)",
+  "hsl(280 70% 60%)",
+  "hsl(35 90% 55%)",
+  "hsl(0 70% 55%)",
+  "hsl(190 80% 45%)",
+];
+
+function MemberSpendingChart({
+  rows,
+  currency,
+  locale,
+  totalSpent,
+}: {
+  rows: { id: string; name: string; expense: number; count: number }[];
+  currency: string;
+  locale: string;
+  totalSpent: number;
+}) {
+  const sorted = [...rows].sort((a, b) => b.expense - a.expense);
+  return (
+    <div className="space-y-3">
+      {/* Stacked bar showing share of expense */}
+      {totalSpent > 0 && (
+        <div className="h-3 w-full bg-secondary rounded-full overflow-hidden flex">
+          {sorted.map((m, i) => {
+            const pctVal = (m.expense / totalSpent) * 100;
+            if (pctVal === 0) return null;
+            return (
+              <div
+                key={m.id}
+                className="h-full transition-all"
+                style={{
+                  width: `${pctVal}%`,
+                  background: MEMBER_PALETTE[i % MEMBER_PALETTE.length],
+                }}
+                title={`${m.name}: ${pctVal.toFixed(0)}%`}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {/* Per-member rows */}
+      <div className="space-y-2.5">
+        {sorted.map((m, i) => {
+          const pctVal = totalSpent ? Math.round((m.expense / totalSpent) * 100) : 0;
+          const color = MEMBER_PALETTE[i % MEMBER_PALETTE.length];
+          return (
+            <div key={m.id}>
+              <div className="flex justify-between text-sm mb-1">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full shrink-0"
+                    style={{ background: color }}
+                  />
+                  <span className="font-medium truncate">{m.name}</span>
+                  <span className="text-xs text-muted-foreground shrink-0">· {m.count}</span>
+                </div>
+                <div className="tabular-nums shrink-0">
+                  {formatCurrency(m.expense, currency, locale)}
+                  <span className="text-xs text-muted-foreground ml-1">({pctVal}%)</span>
+                </div>
+              </div>
+              <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${Math.min(100, pctVal)}%`,
+                    background: color,
+                  }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

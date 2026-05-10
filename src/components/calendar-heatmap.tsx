@@ -2,6 +2,30 @@
 
 import { cn, formatCurrency } from "@/lib/utils";
 
+/**
+ * Heat scale for expense days:
+ *  0    → neutral grey
+ *  0–0.25 → green (light spend)
+ *  0.25–0.5 → yellow
+ *  0.5–0.75 → orange
+ *  0.75+ → red (high spend)
+ */
+function bucket(intensity: number): { bg: string; text: string } {
+  if (intensity === 0) {
+    return { bg: "bg-muted/40 dark:bg-muted/30", text: "text-muted-foreground" };
+  }
+  if (intensity <= 0.25) {
+    return { bg: "bg-emerald-400/35 dark:bg-emerald-400/30", text: "text-emerald-900 dark:text-emerald-100" };
+  }
+  if (intensity <= 0.5) {
+    return { bg: "bg-amber-400/55 dark:bg-amber-400/40", text: "text-amber-900 dark:text-amber-50" };
+  }
+  if (intensity <= 0.75) {
+    return { bg: "bg-orange-500/70 dark:bg-orange-500/65", text: "text-white" };
+  }
+  return { bg: "bg-red-600/90 dark:bg-red-500/85", text: "text-white" };
+}
+
 export function CalendarHeatmap({
   data,
   monthRef,
@@ -20,9 +44,11 @@ export function CalendarHeatmap({
 
   return (
     <div>
-      <div className="grid grid-cols-7 gap-1.5 text-[10px] text-muted-foreground mb-1">
+      <div className="grid grid-cols-7 gap-1.5 text-[10px] text-muted-foreground mb-1.5">
         {labels.map((l, i) => (
-          <div key={i} className="text-center">{l}</div>
+          <div key={i} className="text-center font-medium">
+            {l}
+          </div>
         ))}
       </div>
       <div className="grid grid-cols-7 gap-1.5">
@@ -31,20 +57,15 @@ export function CalendarHeatmap({
         ))}
         {data.map((d) => {
           const intensity = d.total / max;
-          const cls = !d.total
-            ? "bg-muted/50 text-muted-foreground"
-            : intensity > 0.66
-            ? "bg-primary text-primary-foreground"
-            : intensity > 0.33
-            ? "bg-primary/60 text-primary-foreground"
-            : "bg-primary/25 text-foreground";
+          const { bg, text } = bucket(intensity);
           return (
             <div
               key={d.date}
               title={`${d.date}: ${formatCurrency(d.total, currency, locale)}`}
               className={cn(
-                "aspect-square rounded-md grid place-items-center text-xs font-medium",
-                cls
+                "aspect-square rounded-md grid place-items-center text-xs font-semibold tabular-nums transition-colors",
+                bg,
+                text
               )}
             >
               {d.day}
@@ -52,13 +73,18 @@ export function CalendarHeatmap({
           );
         })}
       </div>
-      <div className="flex items-center justify-end gap-1 mt-2 text-[10px] text-muted-foreground">
-        Less
-        <span className="h-2.5 w-2.5 rounded-sm bg-muted/50" />
-        <span className="h-2.5 w-2.5 rounded-sm bg-primary/25" />
-        <span className="h-2.5 w-2.5 rounded-sm bg-primary/60" />
-        <span className="h-2.5 w-2.5 rounded-sm bg-primary" />
-        More
+
+      {/* Legend */}
+      <div className="flex items-center justify-between mt-3 text-[10px] text-muted-foreground">
+        <span>Less</span>
+        <div className="flex items-center gap-1">
+          <span className="h-2.5 w-2.5 rounded-sm bg-muted/40 dark:bg-muted/30" />
+          <span className="h-2.5 w-2.5 rounded-sm bg-emerald-400/35 dark:bg-emerald-400/30" />
+          <span className="h-2.5 w-2.5 rounded-sm bg-amber-400/55 dark:bg-amber-400/40" />
+          <span className="h-2.5 w-2.5 rounded-sm bg-orange-500/70 dark:bg-orange-500/65" />
+          <span className="h-2.5 w-2.5 rounded-sm bg-red-600/90 dark:bg-red-500/85" />
+        </div>
+        <span>More</span>
       </div>
     </div>
   );

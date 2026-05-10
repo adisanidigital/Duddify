@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "@/components/providers";
+import { NoFlashScript } from "@/components/color-theme";
 
 export const metadata: Metadata = {
   title: "Duddify — Expense Tracker",
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Duddify" />
         <meta name="application-name" content="Duddify" />
+        <script dangerouslySetInnerHTML={{ __html: NoFlashScript }} />
       </head>
       <body className="min-h-screen bg-background font-sans">
         <Providers>{children}</Providers>
