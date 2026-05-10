@@ -22,6 +22,7 @@ import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { formatCurrency, isoDate } from "@/lib/utils";
 import { PageMotion } from "@/components/motion";
+import { ReminderCard } from "@/components/reminder-card";
 
 const CURRENCIES = [
   { code: "INR", locale: "en-IN" },
@@ -441,6 +442,8 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      <ReminderCard />
 
       <AppearanceCard />
 

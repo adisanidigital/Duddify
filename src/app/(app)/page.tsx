@@ -38,6 +38,8 @@ import {
   Receipt,
   TrendingUp,
   Camera,
+  BellRing,
+  X as XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -81,6 +83,24 @@ export default function OverviewPage() {
 
   const isFirstRun = !isLoading && txs.length === 0;
   const isAlone = members.length < 2;
+
+  // "Haven't logged today" smart nudge
+  const todayKey = isoDate(new Date());
+  const loggedToday = txs.some((t) => t.occurred_on === todayKey);
+  const [dismissedNudge, setDismissedNudge] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    try {
+      setDismissedNudge(sessionStorage.getItem("duddify-nudge-dismissed-on"));
+    } catch {}
+  }, []);
+  const dismissNudge = () => {
+    setDismissedNudge(todayKey);
+    try {
+      sessionStorage.setItem("duddify-nudge-dismissed-on", todayKey);
+    } catch {}
+  };
+  const showNudge =
+    !isFirstRun && !loggedToday && txs.length >= 3 && dismissedNudge !== todayKey;
 
   const copyHouseholdId = () => {
     if (!hh) return;
@@ -219,6 +239,36 @@ export default function OverviewPage() {
           />
         </StaggerItem>
       </StaggerChildren>
+
+      {showNudge && (
+        <Card className="border-primary/40 bg-primary/5">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-primary/15 text-primary grid place-items-center shrink-0">
+              <BellRing className="h-5 w-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-sm">Nothing logged today yet</div>
+              <div className="text-xs text-muted-foreground">
+                Spent something? Just a few seconds to keep your dashboards accurate.
+              </div>
+            </div>
+            <Button asChild size="sm">
+              <Link href="/add">
+                <Plus className="h-4 w-4" /> Log
+              </Link>
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 text-muted-foreground"
+              onClick={dismissNudge}
+              aria-label="Dismiss"
+            >
+              <XIcon className="h-4 w-4" />
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {overBudget.length > 0 && (
         <Card className="border-warning/50 bg-warning/5">
