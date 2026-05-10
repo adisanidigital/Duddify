@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { PageHeader } from "@/components/page-header";
 import { CategoryIcon } from "@/components/category-icon";
 import { useCategories } from "@/lib/hooks/use-data";
-import { useHousehold, useSession } from "@/lib/hooks/use-household";
+import { useHousehold, useHouseholdMembers, useSession } from "@/lib/hooks/use-household";
 import { createClient } from "@/lib/supabase/client";
 import type { RecurringRule, TxType } from "@/lib/types";
 import { Plus, Trash2, Pause, Play } from "lucide-react";
@@ -117,6 +117,7 @@ function RuleDialog() {
   const qc = useQueryClient();
   const { data: hh } = useHousehold();
   const { data: session } = useSession();
+  const { data: members = [] } = useHouseholdMembers();
   const { data: categories = [] } = useCategories();
 
   const [open, setOpen] = React.useState(false);
@@ -128,7 +129,12 @@ function RuleDialog() {
   );
   const [nextRun, setNextRun] = React.useState(isoDate(new Date()));
   const [note, setNote] = React.useState("");
+  const [paidBy, setPaidBy] = React.useState("");
   const [busy, setBusy] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!paidBy && session?.id) setPaidBy(session.id);
+  }, [session, paidBy]);
 
   const cats = categories.filter((c) => c.type === type);
   React.useEffect(() => {
@@ -139,21 +145,27 @@ function RuleDialog() {
     if (!hh || !session) return;
     if (!amount || !categoryId) return toast.error("Amount and category required");
     setBusy(true);
-    const { error } = await supabase.from("recurring_rules").insert({
-      household_id: hh.id,
-      category_id: categoryId,
-      type,
-      amount: parseFloat(amount),
-      note: note || null,
-      frequency,
-      day_of_month: frequency === "monthly" ? new Date(nextRun).getDate() : null,
-      next_run_on: nextRun,
-      created_by: session.id,
+    const { data, error } = await supabase.rpc("create_recurring_rule", {
+      p_category_id: categoryId,
+      p_type: type,
+      p_amount: parseFloat(amount),
+      p_frequency: frequency,
+      p_next_run_on: nextRun,
+      p_paid_by: paidBy || session.id,
+      p_note: note || null,
     });
     setBusy(false);
     if (error) return toast.error(error.message);
+    const backfilled = Array.isArray(data) ? data[0]?.backfilled ?? 0 : 0;
     qc.invalidateQueries({ queryKey: ["recurring"] });
-    toast.success("Rule created");
+    qc.invalidateQueries({ queryKey: ["transactions"] });
+    if (backfilled > 0) {
+      toast.success(
+        `Rule created — ${backfilled} ${backfilled === 1 ? "transaction" : "transactions"} added for past dates`
+      );
+    } else {
+      toast.success("Rule created");
+    }
     setOpen(false);
     setAmount("");
     setNote("");
@@ -224,14 +236,32 @@ function RuleDialog() {
               <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label>Next run on</Label>
+              <Label>Start date</Label>
               <Input type="date" value={nextRun} onChange={(e) => setNextRun(e.target.value)} />
             </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Paid by</Label>
+            <Select value={paidBy} onValueChange={setPaidBy}>
+              <SelectTrigger>
+                <SelectValue placeholder="Who pays this?" />
+              </SelectTrigger>
+              <SelectContent>
+                {members.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.display_name ?? m.email ?? "Member"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1.5">
             <Label>Note</Label>
             <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Apartment rent" />
           </div>
+          <p className="text-xs text-muted-foreground">
+            If the start date has already passed (or is today), we&apos;ll add the transaction immediately and continue from then on.
+          </p>
           <Button onClick={save} disabled={busy} size="lg" className="w-full">
             {busy ? "Saving…" : "Create rule"}
           </Button>

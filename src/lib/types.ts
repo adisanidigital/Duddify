@@ -54,6 +54,8 @@ export interface RecurringRule {
   day_of_month: number | null;
   next_run_on: string;
   active: boolean;
+  paid_by: string | null;
+  created_by: string | null;
 }
 
 export interface InvestmentHolding {
