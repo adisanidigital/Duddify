@@ -15,7 +15,7 @@ import { whoOwesWhom } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Copy, Download, LogOut } from "lucide-react";
+import { Copy, Download, LogOut, Pencil, Check, X, UserMinus, DoorOpen } from "lucide-react";
 import { formatCurrency, isoDate } from "@/lib/utils";
 import { PageMotion } from "@/components/motion";
 
@@ -47,12 +47,53 @@ export default function SettingsPage() {
   const [name, setName] = React.useState(hh?.name ?? "");
   const [curr, setCurr] = React.useState(hh?.currency ?? "INR");
 
+  // Nickname (display_name) edit state
+  const [editingName, setEditingName] = React.useState(false);
+  const [nickname, setNickname] = React.useState(profile?.display_name ?? "");
+  const [savingNickname, setSavingNickname] = React.useState(false);
+
   React.useEffect(() => {
     if (hh) {
       setName(hh.name);
       setCurr(hh.currency);
     }
   }, [hh]);
+
+  React.useEffect(() => {
+    if (profile && !editingName) setNickname(profile.display_name ?? "");
+  }, [profile, editingName]);
+
+  const saveNickname = async () => {
+    if (!profile) return;
+    const trimmed = nickname.trim();
+    if (!trimmed) return toast.error("Nickname can't be empty");
+    setSavingNickname(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ display_name: trimmed })
+      .eq("id", profile.id);
+    setSavingNickname(false);
+    if (error) return toast.error(error.message);
+    qc.invalidateQueries({ queryKey: ["profile"] });
+    qc.invalidateQueries({ queryKey: ["members"] });
+    toast.success("Nickname updated");
+    setEditingName(false);
+  };
+
+  const removeMember = async (userId: string, displayName: string | null) => {
+    if (!confirm(`Remove ${displayName ?? "this member"} from the household? Their transactions will stay, but they'll no longer have access.`)) return;
+    const { error } = await supabase.rpc("remove_household_member", { p_user_id: userId });
+    if (error) return toast.error(error.message);
+    qc.invalidateQueries({ queryKey: ["members"] });
+    toast.success("Member removed");
+  };
+
+  const leaveHousehold = async () => {
+    if (!confirm("Leave this household? You'll need a new household ID to rejoin.")) return;
+    const { error } = await supabase.rpc("leave_household");
+    if (error) return toast.error(error.message);
+    if (typeof window !== "undefined") window.location.replace("/onboarding");
+  };
 
   const updateHousehold = async () => {
     if (!hh) return;
@@ -107,10 +148,10 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Profile</CardTitle>
-          <CardDescription>This is you</CardDescription>
+          <CardDescription>This is you — pick any nickname you like</CardDescription>
         </CardHeader>
         <CardContent className="flex items-center gap-3">
-          <div className="h-12 w-12 rounded-full bg-muted overflow-hidden grid place-items-center">
+          <div className="h-12 w-12 rounded-full bg-muted overflow-hidden grid place-items-center shrink-0">
             {profile?.avatar_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
@@ -118,12 +159,62 @@ export default function SettingsPage() {
               <span className="text-sm">{profile?.display_name?.[0] ?? "U"}</span>
             )}
           </div>
-          <div className="flex-1">
-            <div className="font-medium">{profile?.display_name}</div>
-            <div className="text-xs text-muted-foreground">{profile?.email}</div>
+          <div className="flex-1 min-w-0">
+            {editingName ? (
+              <div className="flex items-center gap-1.5">
+                <Input
+                  value={nickname}
+                  onChange={(e) => setNickname(e.target.value)}
+                  placeholder="Your nickname"
+                  className="h-9"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveNickname();
+                    if (e.key === "Escape") {
+                      setNickname(profile?.display_name ?? "");
+                      setEditingName(false);
+                    }
+                  }}
+                />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={saveNickname}
+                  disabled={savingNickname}
+                  aria-label="Save"
+                >
+                  <Check className="h-4 w-4 text-success" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => {
+                    setNickname(profile?.display_name ?? "");
+                    setEditingName(false);
+                  }}
+                  aria-label="Cancel"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <div className="font-medium truncate">{profile?.display_name}</div>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  onClick={() => setEditingName(true)}
+                  aria-label="Edit nickname"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            )}
+            <div className="text-xs text-muted-foreground truncate">{profile?.email}</div>
           </div>
           <form action="/auth/signout" method="post">
-            <Button type="submit" variant="outline">
+            <Button type="submit" variant="outline" size="sm">
               <LogOut className="h-4 w-4" /> Sign out
             </Button>
           </form>
@@ -175,23 +266,59 @@ export default function SettingsPage() {
           <div>
             <Label>Members ({members.length})</Label>
             <div className="space-y-1 mt-1.5">
-              {members.map((m) => (
-                <div key={m.id} className="flex items-center gap-3 py-1.5">
-                  <div className="h-8 w-8 rounded-full bg-muted overflow-hidden grid place-items-center">
-                    {m.avatar_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={m.avatar_url} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <span className="text-xs">{(m.display_name ?? "U")[0]}</span>
+              {members.map((m) => {
+                const isSelf = m.id === profile?.id;
+                return (
+                  <div key={m.id} className="flex items-center gap-3 py-1.5 px-1 rounded-lg hover:bg-accent/40 transition-colors">
+                    <div className="h-8 w-8 rounded-full bg-muted overflow-hidden grid place-items-center shrink-0">
+                      {m.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={m.avatar_url} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-xs">{(m.display_name ?? "U")[0]}</span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">
+                        {m.display_name}
+                        {isSelf && (
+                          <span className="ml-1.5 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                            you
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate">{m.email}</div>
+                    </div>
+                    {!isSelf && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => removeMember(m.id, m.display_name)}
+                        aria-label="Remove member"
+                        title="Remove from household"
+                      >
+                        <UserMinus className="h-4 w-4" />
+                      </Button>
                     )}
                   </div>
-                  <div className="flex-1">
-                    <div className="text-sm font-medium">{m.display_name}</div>
-                    <div className="text-xs text-muted-foreground">{m.email}</div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
+            <p className="text-[11px] text-muted-foreground mt-2">
+              Removing a member detaches them — their past transactions stay, but they lose access until re-invited.
+            </p>
+          </div>
+
+          <Separator />
+
+          <div>
+            <Button variant="outline" onClick={leaveHousehold} className="text-destructive hover:text-destructive">
+              <DoorOpen className="h-4 w-4" /> Leave household
+            </Button>
+            <p className="text-[11px] text-muted-foreground mt-1.5">
+              You&apos;ll be returned to onboarding. Past data stays in the household.
+            </p>
           </div>
         </CardContent>
       </Card>
