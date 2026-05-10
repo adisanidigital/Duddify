@@ -17,11 +17,25 @@ import {
   LogOut,
   CalendarDays,
   Repeat,
+  Menu as MenuIcon,
+  ListOrdered,
+  Copy,
+  HelpCircle,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetTrigger,
+  SheetClose,
+} from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { useHousehold, useProfile, useSession } from "@/lib/hooks/use-household";
+import { toast } from "sonner";
 
 const NAV = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
@@ -33,7 +47,7 @@ const NAV = [
 ];
 
 const SECONDARY = [
-  { href: "/transactions", label: "Transactions", icon: Receipt },
+  { href: "/transactions", label: "All transactions", icon: ListOrdered },
   { href: "/categories", label: "Categories", icon: Tag },
   { href: "/recurring", label: "Recurring", icon: Repeat },
   { href: "/settings", label: "Settings", icon: Settings },
@@ -41,15 +55,16 @@ const SECONDARY = [
 
 const MOBILE_NAV = [
   { href: "/", label: "Home", icon: LayoutDashboard },
-  { href: "/expenses", label: "Expenses", icon: Receipt },
+  { href: "/expenses", label: "Spend", icon: Receipt },
   { href: "/add", label: "Add", icon: Plus, primary: true },
   { href: "/investments", label: "Invest", icon: TrendingUp },
-  { href: "/transactions", label: "Log", icon: Tag },
+  { href: "/transactions", label: "All", icon: ListOrdered },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [drawerOpen, setDrawerOpen] = React.useState(false);
   const { data: session, isLoading: sLoading } = useSession();
   const { data: profile, isLoading: pLoading } = useProfile();
   const { data: household, isLoading: hLoading } = useHousehold();
@@ -64,6 +79,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [ready, session, profile, pathname, router]);
 
+  // close drawer on route change
+  React.useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
+
   if (!ready) {
     return (
       <div className="min-h-screen grid place-items-center">
@@ -73,7 +93,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   if (!profile?.household_id) {
-    // Render children (onboarding page) without shell
     return <>{children}</>;
   }
 
@@ -87,9 +106,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div>
             <div className="font-semibold leading-tight">Duddify</div>
-            <div className="text-xs text-muted-foreground truncate">
-              {household?.name}
-            </div>
+            <div className="text-xs text-muted-foreground truncate">{household?.name}</div>
           </div>
         </div>
         <nav className="px-3 py-2 space-y-1">
@@ -123,15 +140,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile top bar */}
         <header className="md:hidden sticky top-0 z-30 bg-background/85 backdrop-blur border-b safe-top">
-          <div className="flex items-center justify-between px-4 h-12">
+          <div className="flex items-center justify-between px-3 h-14">
+            <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Menu">
+                  <MenuIcon className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="p-0 w-[85%] max-w-sm">
+                <MobileDrawer />
+              </SheetContent>
+            </Sheet>
+
             <div className="flex items-center gap-2">
               <div className="h-7 w-7 rounded-lg bg-primary/15 text-primary grid place-items-center">
                 <Wallet className="h-4 w-4" />
               </div>
-              <div className="font-semibold text-sm truncate max-w-[140px]">
+              <div className="font-semibold text-sm truncate max-w-[160px]">
                 {household?.name}
               </div>
             </div>
+
             <ThemeToggle />
           </div>
         </header>
@@ -145,11 +174,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               const active = pathname === item.href;
               if (item.primary) {
                 return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="flex justify-center -mt-5"
-                  >
+                  <Link key={item.href} href={item.href} className="flex justify-center -mt-5">
                     <span className="h-12 w-12 rounded-full bg-primary text-primary-foreground grid place-items-center shadow-lg shadow-primary/30">
                       <Plus className="h-6 w-6" />
                     </span>
@@ -172,6 +197,83 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </div>
         </nav>
+      </div>
+    </div>
+  );
+}
+
+function MobileDrawer() {
+  const pathname = usePathname();
+  const { data: profile } = useProfile();
+  const { data: household } = useHousehold();
+
+  const copyHouseholdId = () => {
+    if (!household) return;
+    navigator.clipboard.writeText(household.id);
+    toast.success("Household ID copied — share with your partner to invite them");
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="px-5 py-5 border-b">
+        <div className="flex items-center gap-2.5 mb-3">
+          <div className="h-10 w-10 rounded-xl bg-primary/15 text-primary grid place-items-center">
+            <Wallet className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="font-semibold leading-tight">Duddify</div>
+            <div className="text-xs text-muted-foreground truncate">{household?.name}</div>
+          </div>
+        </div>
+        <button
+          onClick={copyHouseholdId}
+          className="flex items-center gap-2 w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-1.5 px-2 rounded-md hover:bg-accent"
+        >
+          <Copy className="h-3 w-3" />
+          Tap to copy household ID (invite partner)
+        </button>
+      </div>
+
+      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
+        <div className="px-2 py-1.5 text-[11px] uppercase tracking-wider text-muted-foreground">
+          Dashboards
+        </div>
+        {NAV.map((item) => (
+          <DrawerLink key={item.href} {...item} active={pathname === item.href} />
+        ))}
+
+        <div className="px-2 pt-4 pb-1.5 text-[11px] uppercase tracking-wider text-muted-foreground">
+          Manage
+        </div>
+        {SECONDARY.map((item) => (
+          <DrawerLink
+            key={item.href}
+            {...item}
+            active={pathname.startsWith(item.href) && item.href !== "/"}
+          />
+        ))}
+      </nav>
+
+      <div className="border-t p-3">
+        <div className="flex items-center gap-2 px-2 py-2">
+          <div className="h-8 w-8 rounded-full bg-muted overflow-hidden grid place-items-center text-xs">
+            {profile?.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
+            ) : (
+              (profile?.display_name ?? "U").slice(0, 1).toUpperCase()
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-medium truncate">{profile?.display_name}</div>
+            <div className="text-[10px] text-muted-foreground truncate">{profile?.email}</div>
+          </div>
+          <form action="/auth/signout" method="post">
+            <Button variant="ghost" size="icon" type="submit" aria-label="Sign out">
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </form>
+        </div>
       </div>
     </div>
   );
@@ -201,6 +303,35 @@ function NavLink({
       <Icon className="h-[18px] w-[18px]" />
       {label}
     </Link>
+  );
+}
+
+function DrawerLink({
+  href,
+  label,
+  icon: Icon,
+  active,
+}: {
+  href: string;
+  label: string;
+  icon: any;
+  active: boolean;
+}) {
+  return (
+    <SheetClose asChild>
+      <Link
+        href={href}
+        className={cn(
+          "flex items-center gap-3 px-3 py-3 rounded-lg text-sm transition-colors",
+          active
+            ? "bg-primary/10 text-primary font-medium"
+            : "text-foreground hover:bg-accent"
+        )}
+      >
+        <Icon className="h-5 w-5" />
+        {label}
+      </Link>
+    </SheetClose>
   );
 }
 

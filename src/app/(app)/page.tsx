@@ -21,10 +21,13 @@ import {
   topCategories,
 } from "@/lib/analytics";
 import { formatCurrency, isoDate, pct, startOfMonth } from "@/lib/utils";
-import { ArrowRight, AlertTriangle, Plus } from "lucide-react";
+import { ArrowRight, AlertTriangle, Plus, Users, Sparkles, Tag } from "lucide-react";
+import { useHouseholdMembers } from "@/lib/hooks/use-household";
+import { toast } from "sonner";
 
 export default function OverviewPage() {
   const { data: hh } = useHousehold();
+  const { data: members = [] } = useHouseholdMembers();
   const { data: categories = [] } = useCategories();
   const yearStart = isoDate(new Date(new Date().getFullYear(), 0, 1));
   const { data: txs = [], isLoading } = useTransactions({ from: yearStart });
@@ -61,6 +64,15 @@ export default function OverviewPage() {
 
   const monthLabel = startOfMonth().toLocaleString(locale, { month: "long", year: "numeric" });
 
+  const isFirstRun = txs.length === 0;
+  const isAlone = members.length < 2;
+
+  const copyHouseholdId = () => {
+    if (!hh) return;
+    navigator.clipboard.writeText(hh.id);
+    toast.success("Household ID copied — share with your partner");
+  };
+
   return (
     <div className="container max-w-6xl py-4 md:py-8 space-y-5">
       <PageHeader
@@ -74,6 +86,69 @@ export default function OverviewPage() {
           </Button>
         }
       />
+
+      {isFirstRun && (
+        <Card className="border-primary/40 bg-primary/5">
+          <CardContent className="p-5">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="h-10 w-10 rounded-xl bg-primary/15 text-primary grid place-items-center shrink-0">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="font-semibold">Welcome to Duddify</div>
+                <div className="text-sm text-muted-foreground">
+                  3 quick steps to get the dashboards alive
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2.5">
+              <Step
+                num={1}
+                done={false}
+                title="Log your first transaction"
+                description="Tap the big + button at the bottom (or below). Try a recent expense."
+                action={
+                  <Button asChild size="sm">
+                    <Link href="/add">
+                      <Plus /> Add now
+                    </Link>
+                  </Button>
+                }
+              />
+              <Step
+                num={2}
+                done={false}
+                title="Set monthly budgets"
+                description="Optional — gives you progress bars and over-budget alerts."
+                action={
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/categories">
+                      <Tag className="h-4 w-4" /> Categories
+                    </Link>
+                  </Button>
+                }
+              />
+              <Step
+                num={3}
+                done={!isAlone}
+                title="Invite your partner"
+                description={
+                  isAlone
+                    ? "Tap to copy your household ID, send it to them. They sign in → Join existing → paste."
+                    : `${members.length} member${members.length > 1 ? "s" : ""} in this household.`
+                }
+                action={
+                  isAlone ? (
+                    <Button size="sm" variant="outline" onClick={copyHouseholdId}>
+                      <Users className="h-4 w-4" /> Copy ID
+                    </Button>
+                  ) : null
+                }
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -259,4 +334,36 @@ function greeting() {
   if (h < 12) return "Good morning";
   if (h < 17) return "Good afternoon";
   return "Good evening";
+}
+
+function Step({
+  num,
+  done,
+  title,
+  description,
+  action,
+}: {
+  num: number;
+  done: boolean;
+  title: string;
+  description: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-3 p-3 rounded-lg bg-background/60 border">
+      <div
+        className={
+          "h-6 w-6 rounded-full grid place-items-center text-xs font-semibold shrink-0 " +
+          (done ? "bg-success/20 text-success" : "bg-primary/20 text-primary")
+        }
+      >
+        {done ? "✓" : num}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium">{title}</div>
+        <div className="text-xs text-muted-foreground">{description}</div>
+      </div>
+      {action}
+    </div>
+  );
 }

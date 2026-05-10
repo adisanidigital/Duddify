@@ -33,6 +33,12 @@ export default function OnboardingPage() {
   const [joinId, setJoinId] = React.useState("");
   const [loading, setLoading] = React.useState(false);
 
+  const goHome = () => {
+    // Hard navigation forces all data hooks to refetch with fresh household
+    if (typeof window !== "undefined") window.location.replace("/");
+    else router.replace("/");
+  };
+
   const create = async () => {
     if (!name.trim()) return;
     setLoading(true);
@@ -42,22 +48,26 @@ export default function OnboardingPage() {
       p_currency: currency,
       p_locale: locale,
     });
-    setLoading(false);
-    if (error) return toast.error(error.message);
-    await qc.invalidateQueries();
+    if (error) {
+      setLoading(false);
+      return toast.error(error.message);
+    }
+    qc.clear();
     toast.success("Household created");
-    router.replace("/");
+    goHome();
   };
 
   const join = async () => {
     if (!joinId.trim()) return;
     setLoading(true);
     const { error } = await supabase.rpc("join_household", { p_id: joinId.trim() });
-    setLoading(false);
-    if (error) return toast.error(error.message);
-    await qc.invalidateQueries();
+    if (error) {
+      setLoading(false);
+      return toast.error(error.message);
+    }
+    qc.clear();
     toast.success("Joined household");
-    router.replace("/");
+    goHome();
   };
 
   return (
