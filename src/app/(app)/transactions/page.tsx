@@ -57,12 +57,30 @@ export default function TransactionsPage() {
     return [...map.entries()].sort(([a], [b]) => b.localeCompare(a));
   }, [filtered]);
 
-  const remove = async (id: string) => {
-    if (!confirm("Delete this transaction?")) return;
-    const { error } = await supabase.from("transactions").delete().eq("id", id);
+  const remove = async (tx: Transaction) => {
+    const { error } = await supabase.from("transactions").delete().eq("id", tx.id);
     if (error) return toast.error(error.message);
     qc.invalidateQueries({ queryKey: ["transactions"] });
-    toast.success("Deleted");
+    const c = catById.get(tx.category_id);
+    toast.success(`Deleted${c ? ` "${c.name}"` : ""}`, {
+      duration: 8000,
+      action: {
+        label: "Undo",
+        onClick: async () => {
+          // Re-insert without the original id (Postgres will assign a new one).
+          const { id: _id, created_at: _ca, ...payload } = tx;
+          const { error: insErr } = await supabase
+            .from("transactions")
+            .insert(payload);
+          if (insErr) {
+            toast.error(insErr.message);
+          } else {
+            toast.success("Restored");
+            qc.invalidateQueries({ queryKey: ["transactions"] });
+          }
+        },
+      },
+    });
   };
 
   return (
@@ -193,7 +211,7 @@ export default function TransactionsPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => remove(t.id)}
+                              onClick={() => remove(t)}
                               className="opacity-0 group-hover:opacity-100"
                               aria-label="Delete"
                             >

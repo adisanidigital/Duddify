@@ -37,6 +37,9 @@ import {
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { useHousehold, useProfile, useSession } from "@/lib/hooks/use-household";
+import { PrivacyToggle } from "@/components/private-value";
+import { BiometricGate } from "@/components/biometric-gate";
+import { CommandPalette } from "@/components/command-palette";
 import { toast } from "sonner";
 
 const NAV = [
@@ -100,10 +103,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   if (!profile?.household_id) {
-    return <>{children}</>;
+    return <BiometricGate>{children}</BiometricGate>;
   }
 
   return (
+    <BiometricGate>
+    <CommandPalette />
     <div className="min-h-screen flex">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex md:w-64 lg:w-72 flex-col border-r glass">
@@ -145,6 +150,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Plus /> Add transaction
             </Link>
           </Button>
+          <button
+            type="button"
+            className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:bg-accent transition-colors"
+            onClick={() => {
+              window.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "k", metaKey: true })
+              );
+            }}
+            aria-label="Open command palette"
+          >
+            <span className="flex items-center gap-1.5">
+              <MenuIcon className="h-3.5 w-3.5" /> Search & jump
+            </span>
+            <kbd className="hidden lg:inline-flex h-5 select-none items-center rounded border bg-muted px-1.5 text-[10px] font-mono">
+              ⌘K
+            </kbd>
+          </button>
           <UserBlock />
         </div>
       </aside>
@@ -178,7 +200,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
             </div>
 
-            <ThemeToggle />
+            <div className="flex items-center gap-0.5">
+              <PrivacyToggle />
+              <ThemeToggle />
+            </div>
           </div>
         </header>
 
@@ -188,6 +213,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <MobileBottomNav pathname={pathname} />
       </div>
     </div>
+    </BiometricGate>
   );
 }
 
@@ -406,6 +432,7 @@ function UserBlock() {
         <div className="text-xs font-medium truncate">{profile?.display_name}</div>
         <div className="text-[10px] text-muted-foreground truncate">{profile?.email}</div>
       </div>
+      <PrivacyToggle />
       <ThemeToggle />
       <form action="/auth/signout" method="post">
         <Button variant="ghost" size="icon" type="submit" aria-label="Sign out">

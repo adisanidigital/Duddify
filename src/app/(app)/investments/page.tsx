@@ -13,10 +13,11 @@ import { useCategories, useHoldings, useTransactions } from "@/lib/hooks/use-dat
 import { useHousehold } from "@/lib/hooks/use-household";
 import { PageMotion } from "@/components/motion";
 import { groupByCategory, groupByMonth } from "@/lib/analytics";
+import { xirr } from "@/lib/insights";
 import { formatCurrency, isoDate, pct } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { Plus, Trash2, RefreshCw } from "lucide-react";
+import { Plus, Trash2, TrendingUp, Activity, Scale } from "lucide-react";
 import { toast } from "sonner";
 
 const HOLDING_TYPES = ["Mutual Funds", "Stocks", "FD / RD", "Gold", "Crypto", "PF / NPS", "Real Estate", "Other"];
@@ -44,6 +45,41 @@ export default function InvestmentsPage() {
   const ytdInvestments = investments
     .filter((t) => t.occurred_on >= isoDate(new Date(new Date().getFullYear(), 0, 1)))
     .reduce((s, t) => s + Number(t.amount), 0);
+
+  // Portfolio-wide XIRR using all logged investment outflows + current value as terminal inflow.
+  const portfolioXirr = React.useMemo(() => {
+    if (investments.length === 0 || portfolioValue <= 0) return 0;
+    const flows = investments
+      .map((t) => ({ date: new Date(t.occurred_on), amount: -Number(t.amount) }))
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+    flows.push({ date: new Date(), amount: portfolioValue });
+    return xirr(flows);
+  }, [investments, portfolioValue]);
+
+  // Portfolio-wide CAGR (simpler, uses earliest investment date)
+  const portfolioCagr = React.useMemo(() => {
+    if (investedValue <= 0 || portfolioValue <= 0 || investments.length === 0) return 0;
+    const earliest = investments
+      .map((t) => new Date(t.occurred_on).getTime())
+      .reduce((m, t) => Math.min(m, t), Infinity);
+    const years = Math.max(0.25, (Date.now() - earliest) / (365 * 86400000));
+    return Math.pow(portfolioValue / investedValue, 1 / years) - 1;
+  }, [investments, investedValue, portfolioValue]);
+
+  const xirrPct = Math.round(portfolioXirr * 1000) / 10;
+  const cagrPct = Math.round(portfolioCagr * 1000) / 10;
+
+  // Allocation rebalance hint: flag types > 50% concentration
+  const allocationByType = React.useMemo(() => {
+    if (portfolioValue === 0) return [] as { type: string; value: number; pct: number }[];
+    const sums = new Map<string, number>();
+    for (const h of holdings) sums.set(h.type, (sums.get(h.type) ?? 0) + Number(h.current_value));
+    return [...sums.entries()]
+      .map(([type, value]) => ({ type, value, pct: Math.round((value / portfolioValue) * 100) }))
+      .sort((a, b) => b.value - a.value);
+  }, [holdings, portfolioValue]);
+  const topAllocation = allocationByType[0];
+  const overConcentrated = topAllocation && topAllocation.pct >= 60;
 
   return (
     <PageMotion className="container max-w-6xl py-4 md:py-8 space-y-5">
@@ -87,6 +123,71 @@ export default function InvestmentsPage() {
           </div>
         </Card>
       </div>
+
+      {/* Returns + allocation rebalance row */}
+      {(portfolioValue > 0 || overConcentrated) && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Card className="p-4">
+            <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <TrendingUp className="h-3 w-3" /> Portfolio XIRR
+            </div>
+            <div
+              className={
+                "text-xl font-semibold tabular-nums mt-1 " +
+                (portfolioXirr >= 0 ? "text-success" : "text-destructive")
+              }
+            >
+              {investments.length > 1 ? `${xirrPct}%` : "—"}
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">
+              Annualised, time-weighted return on logged contributions
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Activity className="h-3 w-3" /> Portfolio CAGR
+            </div>
+            <div
+              className={
+                "text-xl font-semibold tabular-nums mt-1 " +
+                (portfolioCagr >= 0 ? "text-success" : "text-destructive")
+              }
+            >
+              {investedValue > 0 ? `${cagrPct}%` : "—"}
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">
+              Compound annual growth, invested → current value
+            </div>
+          </Card>
+          {overConcentrated && topAllocation ? (
+            <Card className="p-4 border-warning/40 bg-warning/5">
+              <div className="text-xs text-warning flex items-center gap-1.5 font-medium">
+                <Scale className="h-3 w-3" /> Concentration
+              </div>
+              <div className="text-base font-semibold mt-1">
+                {topAllocation.pct}% in {topAllocation.type}
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                Heavy weighting — consider diversifying for risk-adjusted returns.
+              </div>
+            </Card>
+          ) : (
+            allocationByType.length > 1 && (
+              <Card className="p-4">
+                <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Scale className="h-3 w-3" /> Top allocation
+                </div>
+                <div className="text-base font-semibold mt-1">
+                  {topAllocation!.pct}% in {topAllocation!.type}
+                </div>
+                <div className="text-[11px] text-muted-foreground mt-0.5">
+                  {allocationByType.length} asset types
+                </div>
+              </Card>
+            )
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2">
@@ -173,7 +274,7 @@ export default function InvestmentsPage() {
                           {formatCurrency(g, currency, locale)}
                         </td>
                         <td className="px-2 py-3 text-right">
-                          <HoldingActions id={h.id} />
+                          <HoldingActions holding={h} />
                         </td>
                       </tr>
                     );
@@ -280,15 +381,34 @@ function HoldingDialog({ initial }: { initial?: any } = {}) {
   );
 }
 
-function HoldingActions({ id }: { id: string }) {
+function HoldingActions({ holding }: { holding: any }) {
   const supabase = createClient();
   const qc = useQueryClient();
   const remove = async () => {
-    if (!confirm("Delete this holding?")) return;
-    const { error } = await supabase.from("investment_holdings").delete().eq("id", id);
+    const { error } = await supabase
+      .from("investment_holdings")
+      .delete()
+      .eq("id", holding.id);
     if (error) return toast.error(error.message);
     qc.invalidateQueries({ queryKey: ["holdings"] });
-    toast.success("Deleted");
+    toast.success(`Deleted "${holding.name}"`, {
+      duration: 8000,
+      action: {
+        label: "Undo",
+        onClick: async () => {
+          const { id: _id, ...payload } = holding;
+          const { error: insErr } = await supabase
+            .from("investment_holdings")
+            .insert(payload);
+          if (insErr) {
+            toast.error(insErr.message);
+          } else {
+            toast.success("Restored");
+            qc.invalidateQueries({ queryKey: ["holdings"] });
+          }
+        },
+      },
+    });
   };
   return (
     <Button variant="ghost" size="icon" onClick={remove}>

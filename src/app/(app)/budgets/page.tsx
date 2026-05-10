@@ -14,6 +14,7 @@ import { useHousehold } from "@/lib/hooks/use-household";
 import { groupByCategory } from "@/lib/analytics";
 import { cn, formatCurrency, isoDate, pct, startOfMonth, endOfMonth } from "@/lib/utils";
 import { PageMotion } from "@/components/motion";
+import { WhatIfSimulator } from "@/components/what-if-simulator";
 import { createClient } from "@/lib/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -188,6 +189,14 @@ export default function BudgetsPage() {
           </CardContent>
         </Card>
       )}
+
+      <WhatIfSimulator
+        rows={expenseCats
+          .map((c) => ({ category: c, spent: byCat.get(c.id)?.total ?? 0 }))
+          .sort((a, b) => b.spent - a.spent)}
+        currency={currency}
+        locale={locale}
+      />
 
       <BudgetEditDialog
         category={editing}

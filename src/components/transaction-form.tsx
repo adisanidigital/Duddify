@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
+import { motion, AnimatePresence } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,9 +15,11 @@ import { ReceiptUpload } from "@/components/receipt-upload";
 import { cn, isoDate } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import { Mic, Sparkles, X } from "lucide-react";
 import type { Category, Transaction, TxType } from "@/lib/types";
-import { useCategories } from "@/lib/hooks/use-data";
+import { useCategories, useTransactions } from "@/lib/hooks/use-data";
 import { useHousehold, useHouseholdMembers, useSession } from "@/lib/hooks/use-household";
+import { suggestCategory } from "@/lib/insights";
 
 const TYPES: { id: TxType; label: string }[] = [
   { id: "expense", label: "Expense" },
@@ -41,6 +44,13 @@ export function TransactionForm({
   const { data: household } = useHousehold();
   const { data: members = [] } = useHouseholdMembers();
   const { data: categories = [] } = useCategories();
+  // Recent history for smart-category suggestion (last ~6 months is enough)
+  const recentFrom = React.useMemo(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 6);
+    return isoDate(d);
+  }, []);
+  const { data: historyTxs = [] } = useTransactions({ from: recentFrom });
 
   const [type, setType] = React.useState<TxType>((initial?.type as TxType) ?? "expense");
   const [amount, setAmount] = React.useState<string>(
@@ -66,6 +76,108 @@ export function TransactionForm({
     if (categoryId && filteredCats.find((c) => c.id === categoryId)) return;
     setCategoryId(filteredCats[0]?.id ?? "");
   }, [type, filteredCats, categoryId]);
+
+  // Smart category suggestion driven by note text + history
+  const [suggested, setSuggested] = React.useState<Category | null>(null);
+  const [acceptedSuggestion, setAcceptedSuggestion] = React.useState(false);
+  React.useEffect(() => {
+    if (!note || note.trim().length < 3) {
+      setSuggested(null);
+      return;
+    }
+    const id = suggestCategory(note, type, historyTxs, categories);
+    if (!id || id === categoryId) {
+      setSuggested(null);
+      return;
+    }
+    const c = categories.find((x) => x.id === id) ?? null;
+    setSuggested(c);
+  }, [note, type, historyTxs, categories, categoryId]);
+
+  const acceptSuggestion = () => {
+    if (!suggested) return;
+    setCategoryId(suggested.id);
+    setAcceptedSuggestion(true);
+    setSuggested(null);
+    setTimeout(() => setAcceptedSuggestion(false), 1400);
+  };
+
+  // Voice add — Web Speech API
+  const [listening, setListening] = React.useState(false);
+  const [voiceSupported, setVoiceSupported] = React.useState(false);
+  const recognitionRef = React.useRef<any>(null);
+
+  React.useEffect(() => {
+    const w = window as any;
+    const Rec = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (Rec) setVoiceSupported(true);
+  }, []);
+
+  const startListening = () => {
+    const w = window as any;
+    const Rec = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!Rec) return toast.error("Voice input isn't supported in this browser");
+    const r = new Rec();
+    r.lang = navigator.language || "en-IN";
+    r.continuous = false;
+    r.interimResults = false;
+    r.maxAlternatives = 1;
+    r.onresult = (event: any) => {
+      const transcript: string = event.results[0][0].transcript;
+      handleVoiceTranscript(transcript);
+    };
+    r.onerror = () => {
+      setListening(false);
+    };
+    r.onend = () => setListening(false);
+    recognitionRef.current = r;
+    setListening(true);
+    try {
+      r.start();
+    } catch {
+      setListening(false);
+    }
+  };
+
+  const stopListening = () => {
+    try {
+      recognitionRef.current?.stop();
+    } catch {}
+    setListening(false);
+  };
+
+  const handleVoiceTranscript = (raw: string) => {
+    if (!raw) return;
+    // Pull the first numeric token as the amount; strip it from the note.
+    // Supports "250", "1,250", "1250.50", "₹250", "rs 250".
+    const cleaned = raw.replace(/[,]/g, "");
+    const amtMatch = cleaned.match(/(?:rs\.?|inr|₹|usd|\$|€|eur|£|gbp)?\s*(\d+(?:\.\d{1,2})?)/i);
+    let parsedAmount: number | null = null;
+    let consumed = "";
+    if (amtMatch) {
+      parsedAmount = parseFloat(amtMatch[1]);
+      consumed = amtMatch[0];
+    }
+    let noteRest = cleaned.replace(consumed, "").trim();
+    noteRest = noteRest
+      .replace(/^(for|on|at|to|paid|spent|got|earned|invested)\s+/i, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (parsedAmount !== null && parsedAmount > 0) {
+      setAmount(String(parsedAmount));
+    }
+    if (noteRest) {
+      setNote(noteRest);
+    }
+    if (parsedAmount !== null) {
+      toast.success(
+        `Heard: ${parsedAmount}${noteRest ? ` for "${noteRest}"` : ""}`
+      );
+    } else {
+      toast.message("Couldn't parse an amount — copied note only");
+    }
+  };
 
   // Sanitize free-typed amount: only digits + optional single decimal up to 2 places.
   const onAmountChange = (raw: string) => {
@@ -142,9 +254,38 @@ export function TransactionForm({
       </Tabs>
 
       {/* Amount input — taps open the native numeric keyboard on iOS/Android */}
-      <div className="text-center py-3">
-        <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground font-medium mb-2">
+      <div className="text-center py-3 relative">
+        <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground font-medium mb-2 flex items-center justify-center gap-2">
           {currency} amount
+          {voiceSupported && (
+            <button
+              type="button"
+              onClick={listening ? stopListening : startListening}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors",
+                listening
+                  ? "bg-destructive/15 text-destructive"
+                  : "bg-primary/10 text-primary hover:bg-primary/15"
+              )}
+              aria-label={listening ? "Stop listening" : "Speak to add"}
+            >
+              {listening ? (
+                <>
+                  <motion.span
+                    aria-hidden
+                    className="h-1.5 w-1.5 rounded-full bg-destructive"
+                    animate={{ opacity: [1, 0.3, 1] }}
+                    transition={{ duration: 0.9, repeat: Infinity }}
+                  />
+                  Listening — tap to stop
+                </>
+              ) : (
+                <>
+                  <Mic className="h-3 w-3" /> Speak instead
+                </>
+              )}
+            </button>
+          )}
         </div>
         <label htmlFor="amount" className="block cursor-text">
           <input
@@ -196,6 +337,47 @@ export function TransactionForm({
             <p className="text-sm text-muted-foreground">No categories yet for this type.</p>
           )}
         </div>
+        <AnimatePresence>
+          {suggested && (
+            <motion.div
+              key={suggested.id}
+              initial={{ opacity: 0, y: -4, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.96 }}
+              transition={{ duration: 0.22 }}
+              className="mt-2 flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-1.5"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" />
+              <div className="flex-1 text-xs">
+                Based on similar notes, try{" "}
+                <span className="font-medium">{suggested.name}</span>
+              </div>
+              <Button size="sm" variant="ghost" className="h-6 px-2" onClick={acceptSuggestion}>
+                Use it
+              </Button>
+              <button
+                type="button"
+                onClick={() => setSuggested(null)}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label="Dismiss suggestion"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </motion.div>
+          )}
+          {acceptedSuggestion && (
+            <motion.div
+              key="accepted"
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="mt-2 text-[11px] text-success flex items-center gap-1"
+            >
+              <Sparkles className="h-3 w-3" /> Smart-picked for you
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Details */}

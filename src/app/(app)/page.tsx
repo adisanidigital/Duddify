@@ -15,6 +15,9 @@ import {
   StaggerItem,
   AnimatedCurrency,
 } from "@/components/motion";
+import { PrivateValue } from "@/components/private-value";
+import { InsightsCarousel } from "@/components/insights-carousel";
+import { CouplesLeaderboard, StreakChip } from "@/components/gamification";
 import { motion } from "motion/react";
 import { useTransactions, useCategories } from "@/lib/hooks/use-data";
 import { useHousehold, useHouseholdMembers } from "@/lib/hooks/use-household";
@@ -76,6 +79,14 @@ export default function OverviewPage() {
       .filter(({ category, total }) => category.monthly_budget && total > Number(category.monthly_budget))
       .slice(0, 3);
   }, [cur, categories]);
+
+  const monthlyBudgetTotal = React.useMemo(
+    () =>
+      categories
+        .filter((c) => c.type === "expense" && c.monthly_budget)
+        .reduce((s, c) => s + Number(c.monthly_budget), 0),
+    [categories]
+  );
 
   const recent = txs.slice(0, 6);
   const catById = new Map(categories.map((c) => [c.id, c] as const));
@@ -183,10 +194,19 @@ export default function OverviewPage() {
                 (net >= 0 ? "gradient-text-primary" : "text-destructive")
               }
             >
-              <AnimatedCurrency value={Math.max(0, net)} currency={currency} locale={locale} />
+              <PrivateValue mask="••••••••">
+                <AnimatedCurrency value={Math.max(0, net)} currency={currency} locale={locale} />
+              </PrivateValue>
             </div>
             <div className="text-xs text-muted-foreground mt-0.5">
-              {savingsRate}% savings rate · {formatCurrency(curSums.income, currency, locale)} earned
+              {savingsRate}% savings rate ·{" "}
+              <PrivateValue mask="••••">
+                {formatCurrency(curSums.income, currency, locale)}
+              </PrivateValue>{" "}
+              earned
+            </div>
+            <div className="mt-2 flex md:justify-end">
+              <StreakChip txs={txs} />
             </div>
           </FadeIn>
         </div>
@@ -287,8 +307,13 @@ export default function OverviewPage() {
                       <div className="flex justify-between text-xs mb-0.5">
                         <span>{category.name}</span>
                         <span className="font-medium">
-                          {formatCurrency(total, currency, locale)} /{" "}
-                          {formatCurrency(budget, currency, locale)}
+                          <PrivateValue mask="•••">
+                            {formatCurrency(total, currency, locale)}
+                          </PrivateValue>{" "}
+                          /{" "}
+                          <PrivateValue mask="•••">
+                            {formatCurrency(budget, currency, locale)}
+                          </PrivateValue>
                         </span>
                       </div>
                       <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
@@ -305,6 +330,19 @@ export default function OverviewPage() {
           </CardContent>
         </Card>
       )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2">
+          <InsightsCarousel
+            txs={txs}
+            categories={categories}
+            currency={currency}
+            locale={locale}
+            monthlyBudgetTotal={monthlyBudgetTotal || null}
+          />
+        </div>
+        <CouplesLeaderboard txs={cur} members={members} currency={currency} locale={locale} />
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2">
@@ -333,7 +371,9 @@ export default function OverviewPage() {
                       <div className="flex justify-between text-sm mb-1">
                         <span className="font-medium">{category.name}</span>
                         <span className="tabular-nums">
-                          {formatCurrency(total, currency, locale)}{" "}
+                          <PrivateValue mask="••••">
+                            {formatCurrency(total, currency, locale)}
+                          </PrivateValue>{" "}
                           <span className="text-muted-foreground text-xs">({pctOfTotal}%)</span>
                         </span>
                       </div>
@@ -354,7 +394,7 @@ export default function OverviewPage() {
         <Card>
           <CardHeader>
             <CardTitle>Breakdown</CardTitle>
-            <CardDescription>This month by category</CardDescription>
+            <CardDescription>This month by category · hover or tap to inspect</CardDescription>
           </CardHeader>
           <CardContent>
             <CategoryPie
@@ -365,6 +405,8 @@ export default function OverviewPage() {
               }))}
               currency={currency}
               locale={locale}
+              centerLabel="Spent"
+              height={240}
             />
           </CardContent>
         </Card>

@@ -2,8 +2,11 @@
 
 import * as React from "react";
 import {
+  AnimatePresence,
   motion,
+  useInView,
   useMotionValue,
+  useReducedMotion,
   useSpring,
   useTransform,
   type HTMLMotionProps,
@@ -107,13 +110,11 @@ export function AnimatedCurrency({
   value,
   currency = "INR",
   locale = "en-IN",
-  duration = 0.9,
   className,
 }: {
   value: number;
   currency?: string;
   locale?: string;
-  duration?: number;
   className?: string;
 }) {
   const mv = useMotionValue(0);
@@ -170,4 +171,243 @@ export function HoverCard({
   );
 }
 
-export { motion };
+/** Scale + lift on hover/tap — great for buttons & icon tiles. */
+export function HoverScale({
+  children,
+  className,
+  scale = 1.04,
+  ...rest
+}: {
+  children: React.ReactNode;
+  className?: string;
+  scale?: number;
+} & HTMLMotionProps<"div">) {
+  const reduce = useReducedMotion();
+  return (
+    <motion.div
+      whileHover={reduce ? undefined : { scale, y: -1 }}
+      whileTap={reduce ? undefined : { scale: 0.97 }}
+      transition={SPRING}
+      className={className}
+      {...rest}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/** Reveals contents on scroll-into-view. */
+export function ScrollReveal({
+  children,
+  className,
+  delay = 0,
+  y = 16,
+  once = true,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  delay?: number;
+  y?: number;
+  once?: boolean;
+}) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once, amount: 0.2 });
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y }}
+      animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y }}
+      transition={{ duration: 0.5, ease: EASE, delay }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/** Shimmering skeleton block (data loading placeholder). */
+export function Shimmer({ className }: { className?: string }) {
+  return (
+    <div
+      className={
+        "relative overflow-hidden rounded-md bg-muted/60 " + (className ?? "")
+      }
+    >
+      <motion.div
+        initial={{ x: "-100%" }}
+        animate={{ x: "200%" }}
+        transition={{
+          duration: 1.4,
+          repeat: Infinity,
+          ease: "linear",
+        }}
+        className="absolute inset-y-0 w-1/2 bg-gradient-to-r from-transparent via-foreground/10 to-transparent"
+      />
+    </div>
+  );
+}
+
+/** Single line that flips with a 3D-like roll when value changes (like NumberFlow / Apple Wallet). */
+export function FlipNumber({
+  value,
+  className,
+  format = (v) => v.toString(),
+}: {
+  value: number | string;
+  className?: string;
+  format?: (v: number | string) => string;
+}) {
+  const display = format(value);
+  return (
+    <span className={"relative inline-block tabular-nums " + (className ?? "")}>
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.span
+          key={display}
+          initial={{ y: "0.6em", opacity: 0, rotateX: -25 }}
+          animate={{ y: 0, opacity: 1, rotateX: 0 }}
+          exit={{ y: "-0.6em", opacity: 0, rotateX: 25 }}
+          transition={{ duration: 0.32, ease: EASE }}
+          className="inline-block"
+          style={{ transformOrigin: "50% 50% -10px" }}
+        >
+          {display}
+        </motion.span>
+      </AnimatePresence>
+    </span>
+  );
+}
+
+/** A delta chip that pulses when its value changes. */
+export function PulseOnChange({
+  trigger,
+  children,
+  className,
+}: {
+  trigger: string | number;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <motion.div
+      key={trigger}
+      initial={{ scale: 0.92, opacity: 0.6 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ type: "spring", stiffness: 480, damping: 20 }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/** Lightweight celebratory burst. Pass a `trigger` (e.g. a counter) to fire it. */
+export function ConfettiBurst({
+  trigger,
+  count = 14,
+  colors = ["#22c55e", "#3b82f6", "#a855f7", "#f59e0b", "#ef4444"],
+}: {
+  trigger: number;
+  count?: number;
+  colors?: string[];
+}) {
+  const reduce = useReducedMotion();
+  if (reduce || trigger <= 0) return null;
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-visible">
+      {Array.from({ length: count }).map((_, i) => {
+        const angle = (i / count) * Math.PI * 2;
+        const dist = 60 + Math.random() * 60;
+        const x = Math.cos(angle) * dist;
+        const y = Math.sin(angle) * dist;
+        const color = colors[i % colors.length];
+        return (
+          <motion.span
+            key={`${trigger}-${i}`}
+            initial={{ x: 0, y: 0, scale: 0, opacity: 1, rotate: 0 }}
+            animate={{
+              x,
+              y,
+              scale: [0, 1, 0.8],
+              opacity: [1, 1, 0],
+              rotate: 360,
+            }}
+            transition={{ duration: 0.9, ease: "easeOut" }}
+            className="absolute left-1/2 top-1/2 h-1.5 w-1.5 rounded-sm"
+            style={{ background: color }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+/** Tilt / parallax interaction — gentle 3D tilt on mouse-move. */
+export function TiltCard({
+  children,
+  className,
+  max = 6,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  max?: number;
+}) {
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const rx = useSpring(useTransform(y, [-50, 50], [max, -max]), {
+    stiffness: 220,
+    damping: 22,
+  });
+  const ry = useSpring(useTransform(x, [-50, 50], [-max, max]), {
+    stiffness: 220,
+    damping: 22,
+  });
+  const reduce = useReducedMotion();
+
+  function onMove(e: React.MouseEvent<HTMLDivElement>) {
+    if (reduce) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    x.set(e.clientX - rect.left - rect.width / 2);
+    y.set(e.clientY - rect.top - rect.height / 2);
+  }
+  function onLeave() {
+    x.set(0);
+    y.set(0);
+  }
+  return (
+    <motion.div
+      onMouseMove={onMove}
+      onMouseLeave={onLeave}
+      style={{ rotateX: rx, rotateY: ry, transformStyle: "preserve-3d" }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/** Animated gradient ring border — for highlighting hero KPIs. */
+export function GradientRing({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={"relative rounded-2xl p-[1px] " + (className ?? "")}>
+      <motion.div
+        aria-hidden
+        className="absolute inset-0 rounded-2xl opacity-70"
+        style={{
+          background:
+            "conic-gradient(from 0deg, hsl(var(--primary)), hsl(var(--success)), hsl(var(--primary)))",
+        }}
+        animate={{ rotate: 360 }}
+        transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+      />
+      <div className="relative rounded-2xl bg-card">{children}</div>
+    </div>
+  );
+}
+
+export { motion, AnimatePresence };

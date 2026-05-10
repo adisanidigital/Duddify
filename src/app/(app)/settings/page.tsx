@@ -15,7 +15,7 @@ import { whoOwesWhom } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Copy, Download, LogOut, Pencil, Check, X, UserMinus, DoorOpen, Palette, Sun, Moon, Monitor } from "lucide-react";
+import { Copy, Download, LogOut, Pencil, Check, X, UserMinus, DoorOpen, Palette, Sun, Moon, Monitor, Share2, IndianRupee } from "lucide-react";
 import { useColorTheme } from "@/components/color-theme";
 import { COLOR_THEMES } from "@/lib/color-themes";
 import { useTheme } from "next-themes";
@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { formatCurrency, isoDate } from "@/lib/utils";
 import { PageMotion } from "@/components/motion";
 import { ReminderCard } from "@/components/reminder-card";
+import { SecuritySettings } from "@/components/security-settings";
 
 const CURRENCIES = [
   { code: "INR", locale: "en-IN" },
@@ -256,6 +257,8 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      <SecuritySettings userLabel={profile?.display_name ?? profile?.email} />
+
       <Card>
         <CardHeader>
           <CardTitle>Household</CardTitle>
@@ -418,26 +421,21 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Who owes whom (this month)</CardTitle>
-            <CardDescription>Assumes expenses are split equally</CardDescription>
+            <CardDescription>Assumes expenses are split equally · tap a row to share / pay</CardDescription>
           </CardHeader>
           <CardContent>
             {settle.settle.length === 0 ? (
               <p className="text-sm text-muted-foreground">All settled up.</p>
             ) : (
-              <div className="space-y-2">
-                {settle.settle.map((s, i) => (
-                  <div key={i} className="flex items-center justify-between text-sm py-1.5">
-                    <span>
-                      <span className="font-medium">{memberById.get(s.from)?.display_name}</span>
-                      {" → "}
-                      <span className="font-medium">{memberById.get(s.to)?.display_name}</span>
-                    </span>
-                    <span className="tabular-nums font-semibold">
-                      {formatCurrency(s.amount, currency, locale)}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              <SettleUpList
+                rows={settle.settle.map((s) => ({
+                  from: memberById.get(s.from)?.display_name ?? "Member",
+                  to: memberById.get(s.to)?.display_name ?? "Member",
+                  amount: s.amount,
+                }))}
+                currency={currency}
+                locale={locale}
+              />
             )}
           </CardContent>
         </Card>
@@ -558,5 +556,124 @@ function AppearanceCard() {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function SettleUpList({
+  rows,
+  currency,
+  locale,
+}: {
+  rows: { from: string; to: string; amount: number }[];
+  currency: string;
+  locale: string;
+}) {
+  const [upiOpenFor, setUpiOpenFor] = React.useState<number | null>(null);
+  const [upiId, setUpiId] = React.useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("duddify.last-upi-id") ?? "";
+  });
+
+  const buildUpiUrl = (amount: number, payeeName: string, payerName: string) => {
+    if (!upiId) return null;
+    const params = new URLSearchParams({
+      pa: upiId,
+      pn: payeeName,
+      am: amount.toFixed(2),
+      cu: "INR",
+      tn: `Settle up from ${payerName} via Duddify`,
+    });
+    return `upi://pay?${params.toString()}`;
+  };
+
+  const shareRow = async (r: { from: string; to: string; amount: number }) => {
+    const text = `Settle up: ${r.from} → ${r.to} ${formatCurrency(r.amount, currency, locale)} (via Duddify)`;
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ text });
+        return;
+      } catch {}
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Copied to clipboard");
+    } catch {
+      toast.error("Couldn't share / copy");
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      {rows.map((r, i) => {
+        const upiOpen = upiOpenFor === i;
+        return (
+          <div key={i} className="rounded-lg border p-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm min-w-0 flex-1">
+                <span className="font-medium">{r.from}</span>
+                <span className="text-muted-foreground"> owes </span>
+                <span className="font-medium">{r.to}</span>
+              </div>
+              <span className="tabular-nums font-semibold text-sm shrink-0">
+                {formatCurrency(r.amount, currency, locale)}
+              </span>
+              <div className="flex items-center gap-1 shrink-0">
+                {currency === "INR" && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setUpiOpenFor(upiOpen ? null : i)}
+                    aria-label="Pay via UPI"
+                    title="Pay via UPI"
+                  >
+                    <IndianRupee className="h-4 w-4" />
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => shareRow(r)}
+                  aria-label="Share"
+                  title="Share or copy"
+                >
+                  <Share2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            {upiOpen && (
+              <div className="mt-2 pt-2 border-t flex items-center gap-2">
+                <Input
+                  placeholder={`${r.to}'s UPI ID e.g. name@bank`}
+                  value={upiId}
+                  onChange={(e) => setUpiId(e.target.value)}
+                  className="h-8 text-sm flex-1"
+                />
+                <Button
+                  size="sm"
+                  disabled={!upiId.trim() || !/^[\w.-]+@[\w.-]+$/.test(upiId.trim())}
+                  onClick={() => {
+                    try {
+                      localStorage.setItem("duddify.last-upi-id", upiId.trim());
+                    } catch {}
+                    const url = buildUpiUrl(r.amount, r.to, r.from);
+                    if (url) {
+                      window.location.href = url;
+                    }
+                  }}
+                >
+                  Open UPI app
+                </Button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+        UPI link opens GPay / PhonePe / Paytm on phone. Share button uses your
+        device&apos;s native share sheet (or copies the message on desktop).
+      </p>
+    </div>
   );
 }
