@@ -17,6 +17,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Copy, Download, LogOut } from "lucide-react";
 import { formatCurrency, isoDate } from "@/lib/utils";
+import { PageMotion } from "@/components/motion";
 
 const CURRENCIES = [
   { code: "INR", locale: "en-IN" },
@@ -100,7 +101,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="container max-w-3xl py-4 md:py-8 space-y-4">
+    <PageMotion className="container max-w-3xl py-4 md:py-8 space-y-4">
       <PageHeader title="Settings" description="Household, members, export" />
 
       <Card>
@@ -238,6 +239,6 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
+    </PageMotion>
   );
 }

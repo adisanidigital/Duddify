@@ -17,6 +17,7 @@ import type { RecurringRule, TxType } from "@/lib/types";
 import { Plus, Trash2, Pause, Play } from "lucide-react";
 import { toast } from "sonner";
 import { formatCurrency, isoDate } from "@/lib/utils";
+import { PageMotion } from "@/components/motion";
 
 function useRecurring() {
   const supabase = createClient();
@@ -45,7 +46,7 @@ export default function RecurringPage() {
   const locale = hh?.locale ?? "en-IN";
 
   return (
-    <div className="container max-w-4xl py-4 md:py-8 space-y-4">
+    <PageMotion className="container max-w-4xl py-4 md:py-8 space-y-4">
       <PageHeader
         title="Recurring"
         description="Auto-create rent, salary, SIPs and more"
@@ -107,7 +108,7 @@ export default function RecurringPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </PageMotion>
   );
 }
 

@@ -10,6 +10,7 @@ import { useHousehold } from "@/lib/hooks/use-household";
 import { groupByMonth, sumByType } from "@/lib/analytics";
 import { formatCurrency } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { PageMotion } from "@/components/motion";
 
 export default function YearlyPage() {
   const [year, setYear] = React.useState(new Date().getFullYear());
@@ -46,7 +47,7 @@ export default function YearlyPage() {
     : 0;
 
   return (
-    <div className="container max-w-6xl py-4 md:py-8 space-y-5">
+    <PageMotion className="container max-w-6xl py-4 md:py-8 space-y-5">
       <PageHeader
         title="Yearly overview"
         description="Compare months, see the big picture"
@@ -109,7 +110,7 @@ export default function YearlyPage() {
           <SavingsRateLine data={savingsRateData} height={220} />
         </CardContent>
       </Card>
-    </div>
+    </PageMotion>
   );
 }
 

@@ -18,6 +18,7 @@ import { cn, formatCurrency } from "@/lib/utils";
 import type { Transaction, TxType } from "@/lib/types";
 import { Paperclip, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { PageMotion } from "@/components/motion";
 
 export default function TransactionsPage() {
   const supabase = createClient();
@@ -65,7 +66,7 @@ export default function TransactionsPage() {
   };
 
   return (
-    <div className="container max-w-4xl py-4 md:py-8 space-y-4">
+    <PageMotion className="container max-w-4xl py-4 md:py-8 space-y-4">
       <PageHeader
         title="Transactions"
         description={`${filtered.length} of ${txs.length} entries`}
@@ -220,6 +221,6 @@ export default function TransactionsPage() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </PageMotion>
   );
 }

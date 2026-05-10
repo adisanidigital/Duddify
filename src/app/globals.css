@@ -4,56 +4,58 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 0 0% 99%;
     --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
     --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
-    --primary: 142 71% 45%;
+    --primary: 158 79% 42%;
     --primary-foreground: 144 80% 10%;
-    --secondary: 240 4.8% 95.9%;
+    --primary-glow: 158 79% 50%;
+    --secondary: 240 5% 95%;
     --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
+    --muted: 240 5% 95%;
+    --muted-foreground: 240 4% 42%;
+    --accent: 240 5% 94%;
     --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 76% 56%;
     --destructive-foreground: 0 0% 98%;
-    --success: 142 71% 45%;
+    --success: 158 79% 42%;
     --success-foreground: 144 80% 10%;
     --warning: 38 92% 50%;
     --warning-foreground: 48 96% 9%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 142 71% 45%;
-    --radius: 0.75rem;
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 158 79% 50%;
+    --radius: 0.85rem;
   }
 
   .dark {
-    --background: 240 10% 3.9%;
+    --background: 240 10% 5%;
     --foreground: 0 0% 98%;
-    --card: 240 8% 6%;
+    --card: 240 10% 8%;
     --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
+    --popover: 240 10% 8%;
     --popover-foreground: 0 0% 98%;
-    --primary: 142 70% 50%;
-    --primary-foreground: 144 80% 10%;
-    --secondary: 240 3.7% 15.9%;
+    --primary: 158 75% 50%;
+    --primary-foreground: 144 80% 8%;
+    --primary-glow: 158 80% 55%;
+    --secondary: 240 4% 15%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
+    --muted: 240 4% 15%;
+    --muted-foreground: 240 5% 64%;
+    --accent: 240 4% 17%;
     --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 50%;
+    --destructive: 0 70% 55%;
     --destructive-foreground: 0 0% 98%;
-    --success: 142 70% 50%;
-    --success-foreground: 144 80% 10%;
-    --warning: 38 92% 55%;
+    --success: 158 75% 50%;
+    --success-foreground: 144 80% 8%;
+    --warning: 38 92% 60%;
     --warning-foreground: 48 96% 9%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 142 70% 50%;
+    --border: 240 4% 17%;
+    --input: 240 4% 18%;
+    --ring: 158 80% 55%;
   }
 }
 
@@ -63,36 +65,122 @@
   }
   html {
     -webkit-tap-highlight-color: transparent;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   body {
     @apply bg-background text-foreground antialiased;
-    font-feature-settings: "cv11", "ss01";
+    font-feature-settings: "cv11", "ss01", "tnum" off;
     overscroll-behavior-y: none;
+    background-image:
+      radial-gradient(circle at 8% 0%, hsl(var(--primary) / 0.07), transparent 38%),
+      radial-gradient(circle at 92% 100%, hsl(var(--primary) / 0.06), transparent 42%);
+    background-attachment: fixed;
   }
-  /* Safe area for iOS PWA */
+  .dark body {
+    background-image:
+      radial-gradient(circle at 8% 0%, hsl(var(--primary) / 0.10), transparent 40%),
+      radial-gradient(circle at 92% 100%, hsl(var(--primary) / 0.08), transparent 45%);
+  }
   .safe-top { padding-top: max(env(safe-area-inset-top), 0.5rem); }
   .safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 0.5rem); }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 999px;
+    border: 2px solid hsl(var(--background));
+  }
+  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.25);
+    color: hsl(var(--foreground));
+  }
 }
 
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  .glass {
+    background: hsl(var(--card) / 0.65);
+    backdrop-filter: saturate(180%) blur(18px);
+    -webkit-backdrop-filter: saturate(180%) blur(18px);
+    border: 1px solid hsl(var(--border) / 0.6);
+  }
+  .glass-strong {
+    background: hsl(var(--card) / 0.85);
+    backdrop-filter: saturate(180%) blur(24px);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+  }
+
+  .gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary-glow)) 100%);
+  }
+  .gradient-text-primary {
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary-glow)) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Subtle inner highlight for glass cards */
+  .surface {
+    position: relative;
+  }
+  .surface::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(180deg, hsl(var(--foreground) / 0.06), transparent 40%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  .ring-glow {
+    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.2), 0 12px 40px -8px hsl(var(--primary) / 0.45);
+  }
+
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.45), 0 10px 30px -8px hsl(var(--primary) / 0.55); }
+    50% { box-shadow: 0 0 0 10px hsl(var(--primary) / 0), 0 14px 36px -6px hsl(var(--primary) / 0.65); }
+  }
+  .animate-pulse-glow { animation: pulse-glow 2.4s ease-in-out infinite; }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  .animate-shimmer {
+    background: linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.06), transparent);
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
 }
 
 /* Print to PDF — clean, monochrome-friendly layout */
 @media print {
-  html, body { background: white !important; color: black !important; }
+  html, body { background: white !important; color: black !important; background-image: none !important; }
   aside, header, nav, .print\:hidden { display: none !important; }
   main { padding: 0 !important; }
   .container { max-width: 100% !important; padding: 0 !important; }
   .border, .shadow-sm, .shadow, .shadow-md, .shadow-lg { box-shadow: none !important; }
-  .bg-card, .bg-card\/50, .bg-background\/85 { background: white !important; }
+  .bg-card, .bg-card\/50, .bg-background\/85, .glass, .glass-strong { background: white !important; backdrop-filter: none !important; }
   .rounded-xl, .rounded-lg { border-radius: 8px !important; }
   .text-muted-foreground { color: #555 !important; }
   .text-success { color: #15803d !important; }
   .text-destructive { color: #b91c1c !important; }
   .text-primary { color: #047857 !important; }
   .text-warning { color: #b45309 !important; }
-  /* Avoid splitting cards across pages */
-  .lg\:col-span-2, [class*="Card"] { break-inside: avoid; page-break-inside: avoid; }
+  [class*="Card"] { break-inside: avoid; page-break-inside: avoid; }
 }

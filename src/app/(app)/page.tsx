@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/page-header";
 import { KpiCard } from "@/components/kpi-card";
 import { TransactionRow } from "@/components/transaction-row";
 import { CategoryPie } from "@/components/charts";
+import { PageMotion, FadeIn, StaggerChildren, StaggerItem } from "@/components/motion";
 import { useTransactions } from "@/lib/hooks/use-data";
 import { useCategories } from "@/lib/hooks/use-data";
 import { useHousehold } from "@/lib/hooks/use-household";
@@ -74,18 +75,29 @@ export default function OverviewPage() {
   };
 
   return (
-    <div className="container max-w-6xl py-4 md:py-8 space-y-5">
-      <PageHeader
-        title={`${greeting()},`}
-        description={`Here's your ${monthLabel} so far.`}
-        actions={
-          <Button asChild className="hidden md:inline-flex">
-            <Link href="/add">
-              <Plus /> Add transaction
-            </Link>
-          </Button>
-        }
-      />
+    <PageMotion className="container max-w-6xl py-4 md:py-8 space-y-5">
+      {/* Animated hero gradient ribbon */}
+      <div className="relative -mx-4 md:-mx-6 mb-2 md:mb-4 px-4 md:px-6 pt-1">
+        <div className="absolute inset-0 -z-10 overflow-hidden">
+          <div className="absolute -top-24 left-1/4 h-72 w-72 rounded-full bg-primary/15 blur-3xl animate-pulse" />
+          <div className="absolute -top-16 right-10 h-56 w-56 rounded-full bg-emerald-500/10 blur-3xl" />
+        </div>
+        <PageHeader
+          title={
+            <>
+              {greeting()}, <span className="gradient-text-primary">welcome back.</span>
+            </>
+          }
+          description={`Here's your ${monthLabel} so far.`}
+          actions={
+            <Button asChild className="hidden md:inline-flex" size="lg">
+              <Link href="/add">
+                <Plus /> Add transaction
+              </Link>
+            </Button>
+          }
+        />
+      </div>
 
       {isFirstRun && (
         <Card className="border-primary/40 bg-primary/5">
@@ -151,44 +163,52 @@ export default function OverviewPage() {
       )}
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard
-          label="Spent"
-          value={curSums.expense}
-          delta={deltaPct(curSums.expense, prevSums.expense)}
-          invertColors
-          accent="destructive"
-          currency={currency}
-          locale={locale}
-          hint="vs last month"
-        />
-        <KpiCard
-          label="Income"
-          value={curSums.income}
-          delta={deltaPct(curSums.income, prevSums.income)}
-          accent="success"
-          currency={currency}
-          locale={locale}
-          hint="vs last month"
-        />
-        <KpiCard
-          label="Invested"
-          value={curSums.investment}
-          delta={deltaPct(curSums.investment, prevSums.investment)}
-          accent="primary"
-          currency={currency}
-          locale={locale}
-          hint="vs last month"
-        />
-        <KpiCard
-          label="Net saved"
-          value={Math.max(0, net)}
-          accent={net >= 0 ? "success" : "destructive"}
-          currency={currency}
-          locale={locale}
-          hint={`${savingsRate}% rate`}
-        />
-      </div>
+      <StaggerChildren className="grid grid-cols-2 md:grid-cols-4 gap-3" delay={0.06}>
+        <StaggerItem>
+          <KpiCard
+            label="Spent"
+            value={curSums.expense}
+            delta={deltaPct(curSums.expense, prevSums.expense)}
+            invertColors
+            accent="destructive"
+            currency={currency}
+            locale={locale}
+            hint="vs last month"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <KpiCard
+            label="Income"
+            value={curSums.income}
+            delta={deltaPct(curSums.income, prevSums.income)}
+            accent="success"
+            currency={currency}
+            locale={locale}
+            hint="vs last month"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <KpiCard
+            label="Invested"
+            value={curSums.investment}
+            delta={deltaPct(curSums.investment, prevSums.investment)}
+            accent="primary"
+            currency={currency}
+            locale={locale}
+            hint="vs last month"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <KpiCard
+            label="Net saved"
+            value={Math.max(0, net)}
+            accent={net >= 0 ? "success" : "destructive"}
+            currency={currency}
+            locale={locale}
+            hint={`${savingsRate}% rate`}
+          />
+        </StaggerItem>
+      </StaggerChildren>
 
       {overBudget.length > 0 && (
         <Card className="border-warning/50 bg-warning/5">
@@ -310,21 +330,22 @@ export default function OverviewPage() {
               No transactions yet — tap <Link href="/add" className="text-primary underline">Add</Link> to get started.
             </div>
           ) : (
-            <div className="space-y-0.5">
+            <StaggerChildren className="space-y-0.5" delay={0.04}>
               {recent.map((t) => (
-                <TransactionRow
-                  key={t.id}
-                  tx={t}
-                  category={catById.get(t.category_id)}
-                  currency={currency}
-                  locale={locale}
-                />
+                <StaggerItem key={t.id}>
+                  <TransactionRow
+                    tx={t}
+                    category={catById.get(t.category_id)}
+                    currency={currency}
+                    locale={locale}
+                  />
+                </StaggerItem>
               ))}
-            </div>
+            </StaggerChildren>
           )}
         </CardContent>
       </Card>
-    </div>
+    </PageMotion>
   );
 }
 

@@ -9,6 +9,7 @@ import { useCategories, useTransactions } from "@/lib/hooks/use-data";
 import { useHousehold } from "@/lib/hooks/use-household";
 import { groupByCategory } from "@/lib/analytics";
 import { cn, formatCurrency, isoDate, pct, startOfMonth, endOfMonth } from "@/lib/utils";
+import { PageMotion } from "@/components/motion";
 
 export default function BudgetsPage() {
   const [ref, setRef] = React.useState(() => startOfMonth(new Date()));
@@ -33,7 +34,7 @@ export default function BudgetsPage() {
   const remaining = totalBudget - totalSpent;
 
   return (
-    <div className="container max-w-5xl py-4 md:py-8 space-y-5">
+    <PageMotion className="container max-w-5xl py-4 md:py-8 space-y-5">
       <PageHeader
         title="Budgets"
         description="Set monthly limits per category"
@@ -147,6 +148,6 @@ export default function BudgetsPage() {
           </CardContent>
         </Card>
       )}
-    </div>
+    </PageMotion>
   );
 }

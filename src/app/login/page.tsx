@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Wallet } from "lucide-react";
+import { motion } from "motion/react";
 
 export default function LoginPage() {
   const supabase = createClient();
@@ -48,13 +49,28 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 safe-top safe-bottom bg-gradient-to-b from-background to-muted/40">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center p-6 safe-top safe-bottom relative overflow-hidden">
+      <div className="absolute inset-0 -z-10">
+        <div className="absolute -top-32 -left-20 h-96 w-96 rounded-full bg-primary/20 blur-3xl animate-pulse" />
+        <div className="absolute -bottom-32 -right-20 h-96 w-96 rounded-full bg-emerald-500/15 blur-3xl" />
+      </div>
+      <motion.div
+        initial={{ opacity: 0, y: 12, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        className="w-full max-w-md"
+      >
+        <Card className="surface">
         <CardHeader className="text-center pb-2">
-          <div className="mx-auto h-14 w-14 rounded-2xl bg-primary/15 text-primary flex items-center justify-center mb-3">
+          <motion.div
+            initial={{ rotate: -8, scale: 0.9, opacity: 0 }}
+            animate={{ rotate: 0, scale: 1, opacity: 1 }}
+            transition={{ delay: 0.15, type: "spring", stiffness: 240, damping: 18 }}
+            className="mx-auto h-14 w-14 rounded-2xl gradient-primary text-primary-foreground flex items-center justify-center mb-3 shadow-lg shadow-primary/30"
+          >
             <Wallet className="h-7 w-7" />
-          </div>
-          <CardTitle className="text-2xl">Welcome to Duddify</CardTitle>
+          </motion.div>
+          <CardTitle className="text-2xl tracking-tight">Welcome to <span className="gradient-text-primary">Duddify</span></CardTitle>
           <CardDescription>
             Track expenses, income and investments — together.
           </CardDescription>
@@ -102,6 +118,7 @@ export default function LoginPage() {
           </p>
         </CardContent>
       </Card>
+      </motion.div>
     </div>
   );
 }

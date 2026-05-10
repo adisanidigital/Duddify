@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/page-header";
 import { CategoryPie, MonthBars, TrendArea } from "@/components/charts";
 import { useCategories, useHoldings, useTransactions } from "@/lib/hooks/use-data";
 import { useHousehold } from "@/lib/hooks/use-household";
+import { PageMotion } from "@/components/motion";
 import { groupByCategory, groupByMonth } from "@/lib/analytics";
 import { formatCurrency, isoDate, pct } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
@@ -45,7 +46,7 @@ export default function InvestmentsPage() {
     .reduce((s, t) => s + Number(t.amount), 0);
 
   return (
-    <div className="container max-w-6xl py-4 md:py-8 space-y-5">
+    <PageMotion className="container max-w-6xl py-4 md:py-8 space-y-5">
       <PageHeader
         title="Investments"
         description="Your wealth at a glance"
@@ -186,7 +187,7 @@ export default function InvestmentsPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
+    </PageMotion>
   );
 }
 

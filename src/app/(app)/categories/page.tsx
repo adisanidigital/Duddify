@@ -17,6 +17,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { Category, TxType } from "@/lib/types";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { PageMotion } from "@/components/motion";
 import { cn, formatCurrency } from "@/lib/utils";
 
 const COLORS = [
@@ -33,7 +34,7 @@ export default function CategoriesPage() {
   const filtered = categories.filter((c) => c.type === type);
 
   return (
-    <div className="container max-w-4xl py-4 md:py-8 space-y-4">
+    <PageMotion className="container max-w-4xl py-4 md:py-8 space-y-4">
       <PageHeader
         title="Categories"
         description="Customise categories, colors, icons and budgets"
@@ -67,7 +68,7 @@ export default function CategoriesPage() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </PageMotion>
   );
 }
 

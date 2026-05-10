@@ -8,6 +8,7 @@ import { useCategories, useTransactions } from "@/lib/hooks/use-data";
 import { useHousehold } from "@/lib/hooks/use-household";
 import { groupByCategory, groupByMonth } from "@/lib/analytics";
 import { formatCurrency, isoDate, pct } from "@/lib/utils";
+import { PageMotion } from "@/components/motion";
 
 export default function IncomePage() {
   const { data: hh } = useHousehold();
@@ -30,7 +31,7 @@ export default function IncomePage() {
   const avgMonth = monthly.length ? monthly.reduce((s, m) => s + m.income, 0) / monthly.length : 0;
 
   return (
-    <div className="container max-w-6xl py-4 md:py-8 space-y-5">
+    <PageMotion className="container max-w-6xl py-4 md:py-8 space-y-5">
       <PageHeader title="Income" description="What's coming in" />
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -131,6 +132,6 @@ export default function IncomePage() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </PageMotion>
   );
 }

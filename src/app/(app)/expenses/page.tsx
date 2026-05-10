@@ -7,6 +7,7 @@ import { CategoryPie, DailyBar } from "@/components/charts";
 import { CalendarHeatmap } from "@/components/calendar-heatmap";
 import { MonthPicker } from "@/components/month-picker";
 import { TransactionRow } from "@/components/transaction-row";
+import { PageMotion, StaggerChildren, StaggerItem } from "@/components/motion";
 import { useCategories, useTransactions } from "@/lib/hooks/use-data";
 import { useHousehold } from "@/lib/hooks/use-household";
 import {
@@ -39,37 +40,45 @@ export default function ExpensesPage() {
   const avgPerDay = total / Math.max(1, new Date().getDate());
 
   return (
-    <div className="container max-w-6xl py-4 md:py-8 space-y-5">
+    <PageMotion className="container max-w-6xl py-4 md:py-8 space-y-5">
       <PageHeader
         title="Expenses"
         description="Where your money is going"
         actions={<MonthPicker value={ref} onChange={setRef} locale={locale} />}
       />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="p-4">
-          <div className="text-xs text-muted-foreground">Total spent</div>
-          <div className="text-2xl font-semibold tabular-nums mt-1">
-            {formatCurrency(total, currency, locale)}
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-xs text-muted-foreground">Transactions</div>
-          <div className="text-2xl font-semibold tabular-nums mt-1">{expenses.length}</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-xs text-muted-foreground">Daily average</div>
-          <div className="text-2xl font-semibold tabular-nums mt-1">
-            {formatCurrency(avgPerDay, currency, locale)}
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-xs text-muted-foreground">Top category</div>
-          <div className="text-2xl font-semibold mt-1 truncate">
-            {byCat[0]?.category.name ?? "—"}
-          </div>
-        </Card>
-      </div>
+      <StaggerChildren className="grid grid-cols-2 md:grid-cols-4 gap-3" delay={0.05}>
+        <StaggerItem>
+          <Card className="p-4">
+            <div className="text-xs text-muted-foreground">Total spent</div>
+            <div className="text-2xl font-semibold tabular-nums mt-1">
+              {formatCurrency(total, currency, locale)}
+            </div>
+          </Card>
+        </StaggerItem>
+        <StaggerItem>
+          <Card className="p-4">
+            <div className="text-xs text-muted-foreground">Transactions</div>
+            <div className="text-2xl font-semibold tabular-nums mt-1">{expenses.length}</div>
+          </Card>
+        </StaggerItem>
+        <StaggerItem>
+          <Card className="p-4">
+            <div className="text-xs text-muted-foreground">Daily average</div>
+            <div className="text-2xl font-semibold tabular-nums mt-1">
+              {formatCurrency(avgPerDay, currency, locale)}
+            </div>
+          </Card>
+        </StaggerItem>
+        <StaggerItem>
+          <Card className="p-4">
+            <div className="text-xs text-muted-foreground">Top category</div>
+            <div className="text-2xl font-semibold mt-1 truncate">
+              {byCat[0]?.category.name ?? "—"}
+            </div>
+          </Card>
+        </StaggerItem>
+      </StaggerChildren>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2">
@@ -167,20 +176,21 @@ export default function ExpensesPage() {
           {biggest.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nothing yet.</p>
           ) : (
-            <div className="space-y-0.5">
+            <StaggerChildren className="space-y-0.5" delay={0.04}>
               {biggest.map((t) => (
-                <TransactionRow
-                  key={t.id}
-                  tx={t}
-                  category={catById.get(t.category_id)}
-                  currency={currency}
-                  locale={locale}
-                />
+                <StaggerItem key={t.id}>
+                  <TransactionRow
+                    tx={t}
+                    category={catById.get(t.category_id)}
+                    currency={currency}
+                    locale={locale}
+                  />
+                </StaggerItem>
               ))}
-            </div>
+            </StaggerChildren>
           )}
         </CardContent>
       </Card>
-    </div>
+    </PageMotion>
   );
 }
