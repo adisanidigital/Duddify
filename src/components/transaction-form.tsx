@@ -3,7 +3,6 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { Delete } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,19 +67,29 @@ export function TransactionForm({
     setCategoryId(filteredCats[0]?.id ?? "");
   }, [type, filteredCats, categoryId]);
 
-  const append = (s: string) =>
-    setAmount((a) => {
-      if (s === "." && a.includes(".")) return a;
-      if (s === "0" && a === "0") return a;
-      if (a === "0" && s !== ".") return s;
-      const next = a + s;
-      // limit precision to 2 dp
-      const [int, dec] = next.split(".");
-      if (dec && dec.length > 2) return a;
-      if (int.length > 12) return a;
-      return next;
-    });
-  const backspace = () => setAmount((a) => a.slice(0, -1));
+  // Sanitize free-typed amount: only digits + optional single decimal up to 2 places.
+  const onAmountChange = (raw: string) => {
+    const cleaned = raw
+      .replace(/[^\d.]/g, "")
+      .replace(/(\..*)\./g, "$1");
+    const [int, dec] = cleaned.split(".");
+    let next = int.slice(0, 12);
+    if (dec !== undefined) next += "." + dec.slice(0, 2);
+    setAmount(next);
+  };
+
+  // Auto-focus the amount input on mount so the native numeric keyboard opens
+  // immediately on iOS/Android when this screen is shown.
+  const amountRef = React.useRef<HTMLInputElement>(null);
+  React.useEffect(() => {
+    if (initial?.id) return; // editing — don't steal focus from edit dialog
+    const t = setTimeout(() => {
+      amountRef.current?.focus();
+      // iOS doesn't always pop the keyboard on programmatic focus alone;
+      // a click after focus tends to work better, but most modern Safari does.
+    }, 350); // small delay so the page transition finishes
+    return () => clearTimeout(t);
+  }, [initial?.id]);
 
   const submit = async () => {
     const value = parseFloat(amount);
@@ -132,12 +141,41 @@ export function TransactionForm({
         </TabsList>
       </Tabs>
 
-      {/* Amount display */}
-      <div className="text-center py-4">
-        <div className="text-xs text-muted-foreground mb-1">{currency}</div>
-        <div className="text-5xl md:text-6xl font-bold tabular-nums tracking-tight">
-          {amount || "0"}
+      {/* Amount input — taps open the native numeric keyboard on iOS/Android */}
+      <div className="text-center py-3">
+        <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground font-medium mb-2">
+          {currency} amount
         </div>
+        <label htmlFor="amount" className="block cursor-text">
+          <input
+            id="amount"
+            ref={amountRef}
+            type="text"
+            inputMode="decimal"
+            pattern="[0-9]*\.?[0-9]*"
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+            enterKeyHint="next"
+            value={amount}
+            onChange={(e) => onAmountChange(e.target.value)}
+            placeholder="0"
+            aria-label="Amount"
+            className={cn(
+              "w-full bg-transparent outline-none border-0 focus:ring-0",
+              "text-center text-5xl md:text-6xl font-bold tabular-nums tracking-tight",
+              "placeholder:text-muted-foreground/40",
+              "caret-primary"
+            )}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
+          />
+        </label>
+        <div className="h-0.5 w-24 mx-auto mt-2 rounded-full bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
       </div>
 
       {/* Category chips */}
@@ -158,30 +196,6 @@ export function TransactionForm({
             <p className="text-sm text-muted-foreground">No categories yet for this type.</p>
           )}
         </div>
-      </div>
-
-      {/* Keypad (mobile + tablet) */}
-      <div className="grid grid-cols-3 gap-2 md:max-w-md md:mx-auto">
-        {["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0"].map((k) => (
-          <Button
-            key={k}
-            type="button"
-            variant="outline"
-            className="h-14 text-xl font-medium"
-            onClick={() => append(k)}
-          >
-            {k}
-          </Button>
-        ))}
-        <Button
-          type="button"
-          variant="outline"
-          className="h-14"
-          onClick={backspace}
-          aria-label="Delete"
-        >
-          <Delete />
-        </Button>
       </div>
 
       {/* Details */}
