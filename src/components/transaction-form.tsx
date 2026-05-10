@@ -103,9 +103,19 @@ export function TransactionForm({
   };
 
   // Voice add — Web Speech API
+  // Reliability rules:
+  //   - Single call site for stopping (Stop button, ESC, end event, silence timeout).
+  //   - Auto-stop after 5s of no speech (some browsers don't fire onend).
+  //   - Hard timeout at 12s as a last-resort guard.
+  //   - Always clear timers + ref + state on stop.
+  //   - On result: parse amount, category keyword, paid_by name, "yesterday"/"today";
+  //     fall back to defaults; prompt user about any unresolved required fields.
   const [listening, setListening] = React.useState(false);
   const [voiceSupported, setVoiceSupported] = React.useState(false);
+  const [voiceTranscript, setVoiceTranscript] = React.useState("");
   const recognitionRef = React.useRef<any>(null);
+  const silenceTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hardTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   React.useEffect(() => {
     const w = window as any;
@@ -113,69 +123,234 @@ export function TransactionForm({
     if (Rec) setVoiceSupported(true);
   }, []);
 
+  const clearTimers = React.useCallback(() => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    if (hardTimerRef.current) {
+      clearTimeout(hardTimerRef.current);
+      hardTimerRef.current = null;
+    }
+  }, []);
+
+  const stopListening = React.useCallback(() => {
+    clearTimers();
+    const r = recognitionRef.current;
+    if (r) {
+      try {
+        r.onresult = null;
+        r.onerror = null;
+        r.onend = null;
+        r.onspeechend = null;
+        r.stop();
+        r.abort?.();
+      } catch {}
+    }
+    recognitionRef.current = null;
+    setListening(false);
+    setVoiceTranscript("");
+  }, [clearTimers]);
+
   const startListening = () => {
     const w = window as any;
     const Rec = w.SpeechRecognition || w.webkitSpeechRecognition;
     if (!Rec) return toast.error("Voice input isn't supported in this browser");
+    if (recognitionRef.current) return; // already running
+
     const r = new Rec();
     r.lang = navigator.language || "en-IN";
     r.continuous = false;
-    r.interimResults = false;
+    r.interimResults = true; // so we can show what the user is saying
     r.maxAlternatives = 1;
+
+    let finalText = "";
+
+    const armSilenceTimer = () => {
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = setTimeout(() => {
+        // 5s of no speech → stop and process whatever we got
+        try {
+          r.stop();
+        } catch {}
+      }, 5000);
+    };
+
+    r.onstart = () => {
+      armSilenceTimer();
+      hardTimerRef.current = setTimeout(() => {
+        try {
+          r.stop();
+        } catch {}
+      }, 12000);
+    };
+    r.onspeechstart = () => armSilenceTimer();
     r.onresult = (event: any) => {
-      const transcript: string = event.results[0][0].transcript;
-      handleVoiceTranscript(transcript);
+      armSilenceTimer();
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const res = event.results[i];
+        if (res.isFinal) finalText += res[0].transcript + " ";
+        else interim += res[0].transcript;
+      }
+      setVoiceTranscript((finalText + " " + interim).trim());
     };
-    r.onerror = () => {
-      setListening(false);
+    r.onerror = (event: any) => {
+      const code = event?.error;
+      if (code === "no-speech") {
+        toast.message("I didn't hear anything — try again closer to the mic");
+      } else if (code === "not-allowed" || code === "service-not-allowed") {
+        toast.error("Mic permission was denied. Enable microphone for this site.");
+      } else if (code === "aborted") {
+        // user cancelled — stay silent
+      } else {
+        toast.error(`Voice error: ${code ?? "unknown"}`);
+      }
+      stopListening();
     };
-    r.onend = () => setListening(false);
+    r.onend = () => {
+      // Use whatever we captured (final + interim)
+      const combined = (finalText.trim() ||
+        // fall back to any transient interim text from state
+        voiceTranscript ||
+        "").trim();
+      stopListening();
+      if (combined) handleVoiceTranscript(combined);
+    };
+
     recognitionRef.current = r;
     setListening(true);
+    setVoiceTranscript("");
     try {
       r.start();
-    } catch {
-      setListening(false);
+    } catch (e) {
+      // Some browsers throw if you call start() too quickly after a previous run
+      console.error(e);
+      stopListening();
+      toast.error("Couldn't start the mic — please try again");
     }
   };
 
-  const stopListening = () => {
-    try {
-      recognitionRef.current?.stop();
-    } catch {}
-    setListening(false);
-  };
+  // ESC closes the mic
+  React.useEffect(() => {
+    if (!listening) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") stopListening();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [listening, stopListening]);
+
+  // Always tear down on unmount
+  React.useEffect(() => () => stopListening(), [stopListening]);
+
+  const [voiceMissing, setVoiceMissing] = React.useState<string[]>([]);
 
   const handleVoiceTranscript = (raw: string) => {
     if (!raw) return;
-    // Pull the first numeric token as the amount; strip it from the note.
-    // Supports "250", "1,250", "1250.50", "₹250", "rs 250".
-    const cleaned = raw.replace(/[,]/g, "");
+    const cleaned = raw.replace(/[,]/g, "").trim();
+    const lower = cleaned.toLowerCase();
+
+    // 1. Amount — first numeric (with optional currency token)
     const amtMatch = cleaned.match(/(?:rs\.?|inr|₹|usd|\$|€|eur|£|gbp)?\s*(\d+(?:\.\d{1,2})?)/i);
-    let parsedAmount: number | null = null;
-    let consumed = "";
-    if (amtMatch) {
-      parsedAmount = parseFloat(amtMatch[1]);
-      consumed = amtMatch[0];
+    const parsedAmount = amtMatch ? parseFloat(amtMatch[1]) : null;
+
+    // 2. Date — "today" / "yesterday" / "tomorrow" / "on <weekday>"
+    let parsedDate: string | null = null;
+    if (/\byesterday\b/.test(lower)) {
+      const d = new Date();
+      d.setDate(d.getDate() - 1);
+      parsedDate = isoDate(d);
+    } else if (/\btoday\b/.test(lower)) {
+      parsedDate = isoDate(new Date());
+    } else if (/\btomorrow\b/.test(lower)) {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      parsedDate = isoDate(d);
     }
-    let noteRest = cleaned.replace(consumed, "").trim();
+
+    // 3. Type — keywords overriding the active tab
+    let parsedType: TxType = type;
+    if (/\b(income|earned|salary|received|got paid)\b/.test(lower)) parsedType = "income";
+    else if (/\b(invest(ed|ment)?|bought (mf|stock|gold|bitcoin|crypto))\b/.test(lower))
+      parsedType = "investment";
+    else if (/\b(spent|paid|bought|expense|cost)\b/.test(lower)) parsedType = "expense";
+
+    // 4. Category — best match against names/icons of the (parsedType) categories
+    const eligible = categories.filter((c) => c.type === parsedType);
+    let parsedCategoryId: string | null = null;
+    let bestScore = 0;
+    for (const c of eligible) {
+      const tokens = c.name.toLowerCase().split(/\s+/).filter((t) => t.length >= 3);
+      let score = 0;
+      for (const tok of tokens) {
+        if (lower.includes(tok)) score += tok.length;
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        parsedCategoryId = c.id;
+      }
+    }
+    // Fallback: keyword-based suggestion against history
+    if (!parsedCategoryId && eligible.length > 0) {
+      parsedCategoryId = suggestCategory(cleaned, parsedType, historyTxs, categories);
+    }
+
+    // 5. Paid_by — "by <name>" or "<name> paid"
+    let parsedPaidBy: string | null = null;
+    for (const m of members) {
+      const nm = (m.display_name ?? "").toLowerCase().trim();
+      if (!nm || nm.length < 2) continue;
+      if (lower.includes(nm)) {
+        parsedPaidBy = m.id;
+        break;
+      }
+    }
+
+    // 6. Note — strip recognised tokens
+    let noteRest = cleaned;
+    if (amtMatch) noteRest = noteRest.replace(amtMatch[0], "");
     noteRest = noteRest
-      .replace(/^(for|on|at|to|paid|spent|got|earned|invested)\s+/i, "")
+      .replace(/\b(yesterday|today|tomorrow)\b/gi, "")
+      .replace(/\b(income|earned|salary|received|got paid|spent|paid|bought|invest(ed|ment)?|expense|cost)\b/gi, "")
+      .replace(/^(for|on|at|to)\s+/i, "")
       .replace(/\s+/g, " ")
       .trim();
 
-    if (parsedAmount !== null && parsedAmount > 0) {
-      setAmount(String(parsedAmount));
-    }
-    if (noteRest) {
-      setNote(noteRest);
-    }
-    if (parsedAmount !== null) {
-      toast.success(
-        `Heard: ${parsedAmount}${noteRest ? ` for "${noteRest}"` : ""}`
-      );
+    // Apply
+    if (parsedType !== type) setType(parsedType);
+    if (parsedAmount !== null && parsedAmount > 0) setAmount(String(parsedAmount));
+    if (parsedDate) setDate(parsedDate);
+    if (parsedCategoryId) setCategoryId(parsedCategoryId);
+    if (parsedPaidBy) setPaidBy(parsedPaidBy);
+    if (noteRest) setNote(noteRest);
+
+    // Compute what's missing & nudge user
+    const missing: string[] = [];
+    const finalAmount = parsedAmount ?? (amount ? parseFloat(amount) : null);
+    if (!finalAmount || finalAmount <= 0) missing.push("amount");
+    if (!parsedCategoryId && !categoryId) missing.push("category");
+    setVoiceMissing(missing);
+
+    const heardBits = [
+      parsedAmount ? `${parsedAmount}` : null,
+      noteRest ? `"${noteRest}"` : null,
+      parsedDate
+        ? parsedDate === isoDate(new Date())
+          ? "today"
+          : parsedDate
+        : null,
+    ].filter(Boolean);
+    if (heardBits.length) {
+      toast.success(`Heard: ${heardBits.join(" · ")}`, { duration: 2400 });
     } else {
-      toast.message("Couldn't parse an amount — copied note only");
+      toast.message("Couldn't parse anything — try again with the amount first");
+    }
+    if (missing.length > 0) {
+      toast.message(
+        `Please add the ${missing.join(" and ")} below to save`,
+        { duration: 5000 }
+      );
     }
   };
 
@@ -277,16 +452,76 @@ export function TransactionForm({
                     animate={{ opacity: [1, 0.3, 1] }}
                     transition={{ duration: 0.9, repeat: Infinity }}
                   />
-                  Listening — tap to stop
+                  Stop listening
                 </>
               ) : (
                 <>
-                  <Mic className="h-3 w-3" /> Speak instead
+                  <Mic className="h-3 w-3" /> Speak to add
                 </>
               )}
             </button>
           )}
         </div>
+        <AnimatePresence>
+          {listening && (
+            <motion.div
+              key="voice-overlay"
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="mb-2 mx-auto max-w-md rounded-lg border bg-card/80 backdrop-blur px-3 py-2 text-xs"
+            >
+              <div className="flex items-center gap-2 text-destructive">
+                <motion.span
+                  aria-hidden
+                  className="h-2 w-2 rounded-full bg-destructive"
+                  animate={{ opacity: [1, 0.3, 1] }}
+                  transition={{ duration: 0.9, repeat: Infinity }}
+                />
+                <span className="font-medium">Listening…</span>
+                <span className="text-muted-foreground ml-auto">Auto-stops in 5s of silence</span>
+              </div>
+              {voiceTranscript && (
+                <div className="mt-1 text-foreground italic line-clamp-2">
+                  &ldquo;{voiceTranscript}&rdquo;
+                </div>
+              )}
+              <div className="mt-1.5 text-[10px] text-muted-foreground leading-relaxed">
+                Try: &ldquo;500 for groceries today&rdquo; · &ldquo;1200 dinner paid by Aditi&rdquo; · &ldquo;invested 10000 in mutual funds&rdquo;
+              </div>
+              <div className="mt-2 flex justify-end">
+                <Button size="sm" variant="outline" onClick={stopListening} type="button" className="h-7">
+                  Stop
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {!listening && voiceMissing.length > 0 && (
+            <motion.div
+              key="voice-missing"
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="mb-2 mx-auto max-w-md rounded-lg border border-warning/40 bg-warning/5 px-3 py-2 text-xs text-left flex items-start gap-2"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-warning mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <span className="font-medium">Almost there.</span>{" "}
+                Please pick a {voiceMissing.join(" and ")} below before saving.
+              </div>
+              <button
+                type="button"
+                onClick={() => setVoiceMissing([])}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label="Dismiss"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <label htmlFor="amount" className="block cursor-text">
           <input
             id="amount"

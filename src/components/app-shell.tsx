@@ -77,14 +77,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const ready = !sLoading && !pLoading && !hLoading;
 
-  // Show the splash for a minimum duration on cold start so it actually
-  // gets seen — feels purposeful instead of a flash.
-  const [splashDone, setSplashDone] = React.useState(false);
+  // Show the splash on the very first cold start of this tab/session, then
+  // never again — even if a query briefly refetches on tab focus or the
+  // shell remounts on a layout transition. Otherwise users see a misleading
+  // "loading the app from scratch" screen when navigating between dashboards.
+  const [splashSeen, setSplashSeen] = React.useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return sessionStorage.getItem("duddify.splash-seen") === "true";
+    } catch {
+      return false;
+    }
+  });
   React.useEffect(() => {
-    const t = setTimeout(() => setSplashDone(true), 1100);
+    if (!ready || splashSeen) return;
+    // Hold the splash for a brief minimum so the entrance animation lands,
+    // then mark it seen for the rest of this tab's lifetime.
+    const t = setTimeout(() => {
+      setSplashSeen(true);
+      try {
+        sessionStorage.setItem("duddify.splash-seen", "true");
+      } catch {}
+    }, 700);
     return () => clearTimeout(t);
-  }, []);
-  const showSplash = !ready || !splashDone;
+  }, [ready, splashSeen]);
+
+  const showSplash = !splashSeen && !ready;
 
   React.useEffect(() => {
     if (!ready) return;

@@ -17,7 +17,7 @@ import {
 } from "@/components/motion";
 import { PrivateValue } from "@/components/private-value";
 import { InsightsCarousel } from "@/components/insights-carousel";
-import { CouplesLeaderboard, StreakChip } from "@/components/gamification";
+import { MemberContributions, StreakChip } from "@/components/gamification";
 import { motion } from "motion/react";
 import { useTransactions, useCategories } from "@/lib/hooks/use-data";
 import { useHousehold, useHouseholdMembers } from "@/lib/hooks/use-household";
@@ -332,19 +332,6 @@ export default function OverviewPage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
-          <InsightsCarousel
-            txs={txs}
-            categories={categories}
-            currency={currency}
-            locale={locale}
-            monthlyBudgetTotal={monthlyBudgetTotal || null}
-          />
-        </div>
-        <CouplesLeaderboard txs={cur} members={members} currency={currency} locale={locale} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -447,6 +434,27 @@ export default function OverviewPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Insights + per-member contributions sit at the bottom so the page
+          starts with the most actionable info (KPIs / breakdown / recent),
+          and ends with deeper analysis. */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2">
+          <InsightsCarousel
+            txs={txs}
+            categories={categories}
+            currency={currency}
+            locale={locale}
+            monthlyBudgetTotal={monthlyBudgetTotal || null}
+          />
+        </div>
+        <MemberContributions
+          txs={cur}
+          members={members}
+          currency={currency}
+          locale={locale}
+        />
+      </div>
     </PageMotion>
   );
 }

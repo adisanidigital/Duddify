@@ -5,7 +5,7 @@ import { motion } from "motion/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PrivateValue } from "@/components/private-value";
 import { cn, formatCurrency } from "@/lib/utils";
-import { Flame, Trophy } from "lucide-react";
+import { Flame, Users } from "lucide-react";
 import { loggingStreak, memberLeaderboard } from "@/lib/insights";
 import type { Transaction } from "@/lib/types";
 
@@ -41,7 +41,7 @@ export function StreakChip({ txs }: { txs: Transaction[] }) {
   );
 }
 
-export function CouplesLeaderboard({
+export function MemberContributions({
   txs,
   members,
   currency = "INR",
@@ -55,39 +55,28 @@ export function CouplesLeaderboard({
   const stats = React.useMemo(() => memberLeaderboard(txs, members), [txs, members]);
   if (members.length < 2) return null;
   const max = Math.max(1, ...stats.map((s) => s.spentPaid));
-  const winner = stats[0];
 
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
-          <div className="h-7 w-7 rounded-lg bg-amber-500/10 text-amber-500 grid place-items-center">
-            <Trophy className="h-3.5 w-3.5" />
+          <div className="h-7 w-7 rounded-lg bg-primary/10 text-primary grid place-items-center">
+            <Users className="h-3.5 w-3.5" />
           </div>
-          This month so far
+          Per-member spending this month
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2.5">
         {stats.map((s, idx) => {
-          const isWinner = s.id === winner.id && s.spentPaid > 0;
           const w = (s.spentPaid / max) * 100;
+          const initials = (s.name || "U").trim().slice(0, 1).toUpperCase();
           return (
             <div key={s.id}>
               <div className="flex items-center gap-2 mb-1">
-                <span
-                  className={cn(
-                    "h-5 w-5 rounded-full grid place-items-center text-[10px] font-bold shrink-0",
-                    idx === 0 && s.spentPaid > 0
-                      ? "bg-amber-500/15 text-amber-500"
-                      : "bg-muted text-muted-foreground"
-                  )}
-                >
-                  {idx + 1}
+                <span className="h-6 w-6 rounded-full grid place-items-center text-[11px] font-medium shrink-0 bg-muted text-muted-foreground">
+                  {initials}
                 </span>
-                <span className="text-sm font-medium flex-1 truncate">
-                  {s.name}
-                  {isWinner && <span className="ml-1 text-amber-500">👑</span>}
-                </span>
+                <span className="text-sm font-medium flex-1 truncate">{s.name}</span>
                 <span className="text-xs text-muted-foreground tabular-nums">
                   {s.logged} log{s.logged === 1 ? "" : "s"}
                 </span>
@@ -102,19 +91,19 @@ export function CouplesLeaderboard({
                   initial={{ width: 0 }}
                   animate={{ width: `${w}%` }}
                   transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: idx * 0.08 }}
-                  className={cn(
-                    "h-full rounded-full",
-                    isWinner ? "bg-amber-500" : "bg-primary/60"
-                  )}
+                  className={cn("h-full rounded-full bg-primary/60")}
                 />
               </div>
             </div>
           );
         })}
         <div className="text-[11px] text-muted-foreground pt-1 leading-relaxed">
-          Bars compare amounts paid for shared expenses this month. Logs counts every transaction this person added.
+          Bar = amount each person paid for shared expenses this month. Logs = transactions they entered.
         </div>
       </CardContent>
     </Card>
   );
 }
+
+/** Backwards-compat re-export. */
+export const CouplesLeaderboard = MemberContributions;
