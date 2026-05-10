@@ -88,6 +88,36 @@ export default function SettingsPage() {
     toast.success("Member removed");
   };
 
+  // Inline edit a household member's nickname (shared across household)
+  const [editingMemberId, setEditingMemberId] = React.useState<string | null>(null);
+  const [memberNickname, setMemberNickname] = React.useState("");
+  const [savingMember, setSavingMember] = React.useState(false);
+
+  const startEditMember = (id: string, current: string | null) => {
+    setEditingMemberId(id);
+    setMemberNickname(current ?? "");
+  };
+  const cancelEditMember = () => {
+    setEditingMemberId(null);
+    setMemberNickname("");
+  };
+  const saveMemberNickname = async () => {
+    if (!editingMemberId) return;
+    const trimmed = memberNickname.trim();
+    if (!trimmed) return toast.error("Nickname can't be empty");
+    setSavingMember(true);
+    const { error } = await supabase.rpc("update_member_nickname", {
+      p_user_id: editingMemberId,
+      p_nickname: trimmed,
+    });
+    setSavingMember(false);
+    if (error) return toast.error(error.message);
+    qc.invalidateQueries({ queryKey: ["members"] });
+    qc.invalidateQueries({ queryKey: ["profile"] });
+    toast.success("Nickname updated");
+    cancelEditMember();
+  };
+
   const leaveHousehold = async () => {
     if (!confirm("Leave this household? You'll need a new household ID to rejoin.")) return;
     const { error } = await supabase.rpc("leave_household");
@@ -268,8 +298,12 @@ export default function SettingsPage() {
             <div className="space-y-1 mt-1.5">
               {members.map((m) => {
                 const isSelf = m.id === profile?.id;
+                const isEditing = editingMemberId === m.id;
                 return (
-                  <div key={m.id} className="flex items-center gap-3 py-1.5 px-1 rounded-lg hover:bg-accent/40 transition-colors">
+                  <div
+                    key={m.id}
+                    className="flex items-center gap-3 py-1.5 px-1 rounded-lg hover:bg-accent/40 transition-colors group"
+                  >
                     <div className="h-8 w-8 rounded-full bg-muted overflow-hidden grid place-items-center shrink-0">
                       {m.avatar_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -279,34 +313,86 @@ export default function SettingsPage() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">
-                        {m.display_name}
-                        {isSelf && (
-                          <span className="ml-1.5 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-                            you
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground truncate">{m.email}</div>
+                      {isEditing ? (
+                        <div className="flex items-center gap-1">
+                          <Input
+                            value={memberNickname}
+                            onChange={(e) => setMemberNickname(e.target.value)}
+                            placeholder="Nickname"
+                            className="h-8 text-sm"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") saveMemberNickname();
+                              if (e.key === "Escape") cancelEditMember();
+                            }}
+                          />
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 shrink-0"
+                            onClick={saveMemberNickname}
+                            disabled={savingMember}
+                            aria-label="Save"
+                          >
+                            <Check className="h-3.5 w-3.5 text-success" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 shrink-0"
+                            onClick={cancelEditMember}
+                            aria-label="Cancel"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="text-sm font-medium truncate flex items-center gap-1.5">
+                            {m.display_name}
+                            {isSelf && (
+                              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                                you
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">{m.email}</div>
+                        </>
+                      )}
                     </div>
-                    {!isSelf && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => removeMember(m.id, m.display_name)}
-                        aria-label="Remove member"
-                        title="Remove from household"
-                      >
-                        <UserMinus className="h-4 w-4" />
-                      </Button>
+                    {!isEditing && (
+                      <>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-muted-foreground"
+                          onClick={() => startEditMember(m.id, m.display_name)}
+                          aria-label="Edit nickname"
+                          title="Edit nickname"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        {!isSelf && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => removeMember(m.id, m.display_name)}
+                            aria-label="Remove member"
+                            title="Remove from household"
+                          >
+                            <UserMinus className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </>
                     )}
                   </div>
                 );
               })}
             </div>
             <p className="text-[11px] text-muted-foreground mt-2">
-              Removing a member detaches them — their past transactions stay, but they lose access until re-invited.
+              Tap the pencil to set a nickname for any member — it&apos;s shared across the household.
+              Removing detaches a member but keeps their past transactions.
             </p>
           </div>
 
