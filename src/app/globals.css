@@ -168,19 +168,151 @@
   }
 }
 
-/* Print to PDF — clean, monochrome-friendly layout */
+/* =========================================================================
+   PRINT TO PDF — professional report layout
+   Forces a clean light theme regardless of user mode. Optimised for A4.
+   ========================================================================= */
 @media print {
-  html, body { background: white !important; color: black !important; background-image: none !important; }
-  aside, header, nav, .print\:hidden { display: none !important; }
-  main { padding: 0 !important; }
-  .container { max-width: 100% !important; padding: 0 !important; }
-  .border, .shadow-sm, .shadow, .shadow-md, .shadow-lg { box-shadow: none !important; }
-  .bg-card, .bg-card\/50, .bg-background\/85, .glass, .glass-strong { background: white !important; backdrop-filter: none !important; }
-  .rounded-xl, .rounded-lg { border-radius: 8px !important; }
-  .text-muted-foreground { color: #555 !important; }
-  .text-success { color: #15803d !important; }
-  .text-destructive { color: #b91c1c !important; }
-  .text-primary { color: #047857 !important; }
-  .text-warning { color: #b45309 !important; }
-  [class*="Card"] { break-inside: avoid; page-break-inside: avoid; }
+  /* Page setup */
+  @page {
+    size: A4;
+    margin: 14mm 14mm 16mm 14mm;
+  }
+  @page :first {
+    margin-top: 12mm;
+  }
+
+  /* Force light theme tokens for ALL elements so charts & gradients use
+     print-friendly colors, regardless of user's dark/light preference. */
+  :root, .dark {
+    --background: 0 0% 100% !important;
+    --foreground: 222 20% 12% !important;
+    --card: 0 0% 100% !important;
+    --card-foreground: 222 20% 12% !important;
+    --popover: 0 0% 100% !important;
+    --popover-foreground: 222 20% 12% !important;
+    --primary: 158 75% 30% !important;
+    --primary-foreground: 0 0% 100% !important;
+    --primary-glow: 158 75% 32% !important;
+    --secondary: 220 13% 95% !important;
+    --secondary-foreground: 222 20% 12% !important;
+    --muted: 220 13% 95% !important;
+    --muted-foreground: 220 9% 38% !important;
+    --accent: 220 13% 96% !important;
+    --accent-foreground: 222 20% 12% !important;
+    --destructive: 0 65% 42% !important;
+    --destructive-foreground: 0 0% 100% !important;
+    --success: 158 75% 30% !important;
+    --success-foreground: 0 0% 100% !important;
+    --warning: 36 90% 38% !important;
+    --warning-foreground: 0 0% 100% !important;
+    --border: 220 13% 88% !important;
+    --input: 220 13% 88% !important;
+  }
+
+  html, body {
+    background: white !important;
+    color: hsl(222 20% 12%) !important;
+    background-image: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif !important;
+    font-size: 11pt;
+    line-height: 1.45;
+  }
+
+  /* Hide app chrome */
+  aside, header, nav, .print\:hidden, button:not(.print\:show), form, input[type="button"],
+  [aria-label="Toggle theme"], [aria-label="Sign out"], .sonner-toaster, [data-sonner-toaster] {
+    display: none !important;
+  }
+
+  /* Layout */
+  main { padding: 0 !important; padding-bottom: 0 !important; }
+  .container { max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
+
+  /* Surfaces — flat, paper-like */
+  .bg-card, .bg-card\/50, .bg-card\/60, .bg-card\/70, .bg-card\/85,
+  .bg-background, .bg-background\/85, .bg-background\/40, .bg-background\/60,
+  .glass, .glass-strong, [class*="surface"] {
+    background: white !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .surface::before { display: none !important; }
+
+  /* Cards: hairline border, subtle separation, no shadows */
+  [class*="rounded-xl"], [class*="rounded-lg"] { border-radius: 6px !important; }
+  .shadow-sm, .shadow, .shadow-md, .shadow-lg, .shadow-xl,
+  .hover\:shadow-md, .hover\:shadow-lg {
+    box-shadow: none !important;
+  }
+  .border { border-color: hsl(220 13% 88%) !important; }
+
+  /* Typography */
+  h1 { font-size: 22pt !important; font-weight: 700 !important; letter-spacing: -0.02em !important; line-height: 1.1 !important; }
+  h2 { font-size: 14pt !important; font-weight: 600 !important; }
+  h3 { font-size: 12pt !important; font-weight: 600 !important; }
+  .text-2xl { font-size: 16pt !important; }
+  .text-3xl { font-size: 19pt !important; }
+  .text-4xl, .text-5xl, .text-6xl { font-size: 22pt !important; }
+  .text-xs { font-size: 9pt !important; }
+  .text-sm { font-size: 10pt !important; }
+
+  /* Color neutrals for monochrome-friendly printing on b/w printers */
+  .text-muted-foreground { color: hsl(220 9% 38%) !important; }
+  .text-success { color: hsl(158 75% 28%) !important; }
+  .text-destructive { color: hsl(0 65% 42%) !important; }
+  .text-primary { color: hsl(158 75% 28%) !important; }
+  .text-warning { color: hsl(36 90% 35%) !important; }
+
+  /* Gradient text → solid for print */
+  .gradient-text-primary {
+    background: none !important;
+    color: hsl(158 75% 28%) !important;
+    -webkit-text-fill-color: hsl(158 75% 28%) !important;
+  }
+
+  /* Links — keep readable */
+  a { color: hsl(158 75% 28%) !important; text-decoration: none !important; }
+
+  /* Page-break behavior */
+  [class*="Card"], .card, table, .recharts-wrapper {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  h1, h2, h3 {
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+  }
+
+  /* Recharts overrides — make charts print-perfect */
+  .recharts-cartesian-grid-horizontal line,
+  .recharts-cartesian-grid-vertical line {
+    stroke: hsl(220 13% 88%) !important;
+    stroke-width: 0.5 !important;
+  }
+  .recharts-text { fill: hsl(220 9% 30%) !important; font-size: 9pt !important; }
+  .recharts-tooltip-wrapper { display: none !important; }
+  .recharts-surface { background: white !important; }
+
+  /* Tables */
+  table { width: 100% !important; border-collapse: collapse !important; font-size: 10pt !important; }
+  thead { background: hsl(220 13% 96%) !important; }
+  th { font-weight: 600 !important; padding: 6pt 8pt !important; border-bottom: 1px solid hsl(220 13% 80%) !important; }
+  td { padding: 5pt 8pt !important; border-bottom: 1px solid hsl(220 13% 92%) !important; }
+  tbody tr:last-child td { border-bottom: none !important; }
+
+  /* Print-only blocks */
+  .print-only { display: block !important; }
+  .print-cover { display: flex !important; }
+
+  /* Force colors for status/category dots */
+  .bg-success { background-color: hsl(158 75% 30%) !important; }
+  .bg-destructive { background-color: hsl(0 65% 42%) !important; }
+  .bg-warning { background-color: hsl(36 90% 38%) !important; }
+  .bg-primary { background-color: hsl(158 75% 30%) !important; }
 }
+
+.print-only { display: none; }
+.print-cover { display: none; }
