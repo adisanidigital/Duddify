@@ -16,7 +16,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { Transaction, TxType } from "@/lib/types";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { Paperclip, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function TransactionsPage() {
@@ -170,8 +170,11 @@ export default function TransactionsPage() {
                                 size={18}
                               />
                               <div className="flex-1 min-w-0">
-                                <div className="text-sm font-medium truncate">
+                                <div className="text-sm font-medium truncate flex items-center gap-1.5">
                                   {c?.name ?? "—"}
+                                  {t.receipt_url && (
+                                    <Paperclip className="h-3 w-3 text-muted-foreground" />
+                                  )}
                                 </div>
                                 {t.note && (
                                   <div className="text-xs text-muted-foreground truncate">

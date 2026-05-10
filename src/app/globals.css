@@ -78,3 +78,21 @@
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }
+
+/* Print to PDF — clean, monochrome-friendly layout */
+@media print {
+  html, body { background: white !important; color: black !important; }
+  aside, header, nav, .print\:hidden { display: none !important; }
+  main { padding: 0 !important; }
+  .container { max-width: 100% !important; padding: 0 !important; }
+  .border, .shadow-sm, .shadow, .shadow-md, .shadow-lg { box-shadow: none !important; }
+  .bg-card, .bg-card\/50, .bg-background\/85 { background: white !important; }
+  .rounded-xl, .rounded-lg { border-radius: 8px !important; }
+  .text-muted-foreground { color: #555 !important; }
+  .text-success { color: #15803d !important; }
+  .text-destructive { color: #b91c1c !important; }
+  .text-primary { color: #047857 !important; }
+  .text-warning { color: #b45309 !important; }
+  /* Avoid splitting cards across pages */
+  .lg\:col-span-2, [class*="Card"] { break-inside: avoid; page-break-inside: avoid; }
+}

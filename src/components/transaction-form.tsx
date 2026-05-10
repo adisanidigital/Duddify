@@ -11,6 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CategoryIcon } from "@/components/category-icon";
+import { ReceiptUpload } from "@/components/receipt-upload";
 import { cn, isoDate } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -50,6 +51,7 @@ export function TransactionForm({
   const [date, setDate] = React.useState<string>(initial?.occurred_on ?? isoDate(new Date()));
   const [note, setNote] = React.useState<string>(initial?.note ?? "");
   const [paidBy, setPaidBy] = React.useState<string>(initial?.paid_by ?? session?.id ?? "");
+  const [receiptUrl, setReceiptUrl] = React.useState<string | null>(initial?.receipt_url ?? null);
   const [saving, setSaving] = React.useState(false);
 
   React.useEffect(() => {
@@ -97,6 +99,7 @@ export function TransactionForm({
       occurred_on: date,
       note: note || null,
       paid_by: paidBy || session.id,
+      receipt_url: receiptUrl,
     };
 
     const { error } = initial?.id
@@ -108,6 +111,7 @@ export function TransactionForm({
     toast.success(initial?.id ? "Updated" : "Saved");
     setAmount("");
     setNote("");
+    setReceiptUrl(null);
     qc.invalidateQueries({ queryKey: ["transactions"] });
     if (onSaved) onSaved();
     else if (!compact) router.push("/transactions");
@@ -216,6 +220,11 @@ export function TransactionForm({
           placeholder="What was this for?"
           rows={2}
         />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label>Receipt / bill (optional)</Label>
+        <ReceiptUpload value={receiptUrl} onChange={setReceiptUrl} />
       </div>
 
       <Button size="lg" className="w-full" onClick={submit} disabled={saving}>

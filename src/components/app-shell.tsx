@@ -20,7 +20,7 @@ import {
   Menu as MenuIcon,
   ListOrdered,
   Copy,
-  HelpCircle,
+  FileBarChart,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,7 @@ const NAV = [
   { href: "/income", label: "Income", icon: Wallet },
   { href: "/budgets", label: "Budgets", icon: PieChart },
   { href: "/yearly", label: "Yearly", icon: CalendarDays },
+  { href: "/reports", label: "Reports", icon: FileBarChart },
 ];
 
 const SECONDARY = [
