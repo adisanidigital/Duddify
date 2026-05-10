@@ -4,16 +4,20 @@ import * as React from "react";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { PageHeader } from "@/components/page-header";
 import { KpiCard } from "@/components/kpi-card";
 import { TransactionRow } from "@/components/transaction-row";
 import { CategoryPie } from "@/components/charts";
-import { PageMotion, FadeIn, StaggerChildren, StaggerItem, AnimatedCurrency } from "@/components/motion";
+import {
+  PageMotion,
+  FadeIn,
+  StaggerChildren,
+  StaggerItem,
+  AnimatedCurrency,
+} from "@/components/motion";
 import { motion } from "motion/react";
-import { useTransactions } from "@/lib/hooks/use-data";
-import { useCategories } from "@/lib/hooks/use-data";
-import { useHousehold } from "@/lib/hooks/use-household";
+import { useTransactions, useCategories } from "@/lib/hooks/use-data";
+import { useHousehold, useHouseholdMembers } from "@/lib/hooks/use-household";
 import {
   deltaPct,
   groupByCategory,
@@ -23,8 +27,18 @@ import {
   topCategories,
 } from "@/lib/analytics";
 import { formatCurrency, isoDate, pct, startOfMonth } from "@/lib/utils";
-import { ArrowRight, AlertTriangle, Plus, Users, Sparkles, PieChart } from "lucide-react";
-import { useHouseholdMembers } from "@/lib/hooks/use-household";
+import {
+  ArrowRight,
+  AlertTriangle,
+  Plus,
+  Users,
+  Sparkles,
+  PieChart,
+  Wallet,
+  Receipt,
+  TrendingUp,
+  Camera,
+} from "lucide-react";
 import { toast } from "sonner";
 
 export default function OverviewPage() {
@@ -63,10 +77,9 @@ export default function OverviewPage() {
 
   const recent = txs.slice(0, 6);
   const catById = new Map(categories.map((c) => [c.id, c] as const));
-
   const monthLabel = startOfMonth().toLocaleString(locale, { month: "long", year: "numeric" });
 
-  const isFirstRun = txs.length === 0;
+  const isFirstRun = !isLoading && txs.length === 0;
   const isAlone = members.length < 2;
 
   const copyHouseholdId = () => {
@@ -74,6 +87,16 @@ export default function OverviewPage() {
     navigator.clipboard.writeText(hh.id);
     toast.success("Household ID copied — share with your partner");
   };
+
+  if (isFirstRun) {
+    return (
+      <FirstRunOverview
+        members={members}
+        isAlone={isAlone}
+        onCopyId={copyHouseholdId}
+      />
+    );
+  }
 
   return (
     <PageMotion className="container max-w-6xl py-4 md:py-8 space-y-5">
@@ -120,7 +143,7 @@ export default function OverviewPage() {
                   <span className="gradient-text-primary"> welcome back.</span>
                 </>
               }
-              description={monthLabel}
+              description={`Your ${monthLabel} so far`}
               actions={
                 <Button asChild className="hidden md:inline-flex" size="lg">
                   <Link href="/add">
@@ -149,76 +172,13 @@ export default function OverviewPage() {
         </div>
       </div>
 
-      {isFirstRun && (
-        <Card className="border-primary/40 bg-primary/5">
-          <CardContent className="p-5">
-            <div className="flex items-start gap-3 mb-4">
-              <div className="h-10 w-10 rounded-xl bg-primary/15 text-primary grid place-items-center shrink-0">
-                <Sparkles className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="font-semibold">Welcome to Duddify</div>
-                <div className="text-sm text-muted-foreground">
-                  3 quick steps to get the dashboards alive
-                </div>
-              </div>
-            </div>
-            <div className="space-y-2.5">
-              <Step
-                num={1}
-                done={false}
-                title="Log your first transaction"
-                description="Tap the big + button at the bottom (or below). Try a recent expense."
-                action={
-                  <Button asChild size="sm">
-                    <Link href="/add">
-                      <Plus /> Add now
-                    </Link>
-                  </Button>
-                }
-              />
-              <Step
-                num={2}
-                done={false}
-                title="Set monthly budgets"
-                description="Optional — tap any category in Budgets to set a limit. Get progress bars and alerts."
-                action={
-                  <Button asChild size="sm" variant="outline">
-                    <Link href="/budgets">
-                      <PieChart className="h-4 w-4" /> Budgets
-                    </Link>
-                  </Button>
-                }
-              />
-              <Step
-                num={3}
-                done={!isAlone}
-                title="Invite your partner"
-                description={
-                  isAlone
-                    ? "Tap to copy your household ID, send it to them. They sign in → Join existing → paste."
-                    : `${members.length} member${members.length > 1 ? "s" : ""} in this household.`
-                }
-                action={
-                  isAlone ? (
-                    <Button size="sm" variant="outline" onClick={copyHouseholdId}>
-                      <Users className="h-4 w-4" /> Copy ID
-                    </Button>
-                  ) : null
-                }
-              />
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* KPIs */}
       <StaggerChildren className="grid grid-cols-2 md:grid-cols-4 gap-3" delay={0.06}>
         <StaggerItem>
           <KpiCard
             label="Spent"
             value={curSums.expense}
-            delta={deltaPct(curSums.expense, prevSums.expense)}
+            delta={prevSums.expense ? deltaPct(curSums.expense, prevSums.expense) : undefined}
             invertColors
             accent="destructive"
             currency={currency}
@@ -230,7 +190,7 @@ export default function OverviewPage() {
           <KpiCard
             label="Income"
             value={curSums.income}
-            delta={deltaPct(curSums.income, prevSums.income)}
+            delta={prevSums.income ? deltaPct(curSums.income, prevSums.income) : undefined}
             accent="success"
             currency={currency}
             locale={locale}
@@ -241,7 +201,7 @@ export default function OverviewPage() {
           <KpiCard
             label="Invested"
             value={curSums.investment}
-            delta={deltaPct(curSums.investment, prevSums.investment)}
+            delta={prevSums.investment ? deltaPct(curSums.investment, prevSums.investment) : undefined}
             accent="primary"
             currency={currency}
             locale={locale}
@@ -281,10 +241,12 @@ export default function OverviewPage() {
                           {formatCurrency(budget, currency, locale)}
                         </span>
                       </div>
-                      <Progress
-                        value={Math.min(100, pct(total, budget))}
-                        indicatorClassName="bg-warning"
-                      />
+                      <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-warning"
+                          style={{ width: `${Math.min(100, pct(total, budget))}%` }}
+                        />
+                      </div>
                     </div>
                   );
                 })}
@@ -311,7 +273,7 @@ export default function OverviewPage() {
           </CardHeader>
           <CardContent>
             {topExpenses.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No expenses yet this month.</p>
+              <p className="text-sm text-muted-foreground py-4">No expenses yet this month.</p>
             ) : (
               <div className="space-y-2.5">
                 {topExpenses.map(({ category, total }) => {
@@ -373,11 +335,9 @@ export default function OverviewPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
-          ) : recent.length === 0 ? (
+          {recent.length === 0 ? (
             <div className="text-center py-8 text-sm text-muted-foreground">
-              No transactions yet — tap <Link href="/add" className="text-primary underline">Add</Link> to get started.
+              No transactions this month yet.
             </div>
           ) : (
             <StaggerChildren className="space-y-0.5" delay={0.04}>
@@ -396,6 +356,195 @@ export default function OverviewPage() {
         </CardContent>
       </Card>
     </PageMotion>
+  );
+}
+
+/* ---------- First-run experience ---------- */
+
+function FirstRunOverview({
+  members,
+  isAlone,
+  onCopyId,
+}: {
+  members: any[];
+  isAlone: boolean;
+  onCopyId: () => void;
+}) {
+  return (
+    <PageMotion className="container max-w-3xl py-6 md:py-12 px-4">
+      {/* Hero */}
+      <div className="relative text-center pb-8 pt-2 mb-6">
+        <div className="absolute inset-0 -z-10 overflow-hidden">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.7 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1.6, ease: "easeOut" }}
+            className="absolute -top-32 left-1/2 -translate-x-1/2 h-96 w-96 rounded-full bg-primary/30 blur-3xl"
+          />
+          <motion.div
+            animate={{ opacity: [0.3, 0.6, 0.3] }}
+            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute top-10 left-1/4 h-44 w-44 rounded-full bg-emerald-400/20 blur-3xl"
+          />
+          <motion.div
+            animate={{ opacity: [0.5, 0.2, 0.5] }}
+            transition={{ duration: 7, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+            className="absolute top-20 right-1/4 h-44 w-44 rounded-full bg-cyan-400/20 blur-3xl"
+          />
+        </div>
+
+        <motion.div
+          initial={{ scale: 0.7, opacity: 0, rotate: -10 }}
+          animate={{ scale: 1, opacity: 1, rotate: 0 }}
+          transition={{ type: "spring", stiffness: 220, damping: 18, delay: 0.05 }}
+          className="mx-auto h-20 w-20 rounded-3xl gradient-primary text-primary-foreground grid place-items-center shadow-xl shadow-primary/30 mb-5 animate-pulse-glow"
+        >
+          <Sparkles className="h-9 w-9" />
+        </motion.div>
+
+        <FadeIn delay={0.2}>
+          <h1 className="text-3xl md:text-5xl font-bold tracking-tight leading-tight">
+            Welcome to <span className="gradient-text-primary">Duddify</span>
+          </h1>
+          <p className="text-muted-foreground mt-2 md:mt-3 max-w-md mx-auto">
+            Your shared household finance dashboard is ready. Log your first transaction to bring it to life.
+          </p>
+        </FadeIn>
+
+        <FadeIn delay={0.4} className="mt-6 flex flex-col sm:flex-row gap-2 justify-center">
+          <Button asChild size="lg" className="shadow-lg shadow-primary/30">
+            <Link href="/add">
+              <Plus className="h-5 w-5" /> Add your first transaction
+            </Link>
+          </Button>
+          {isAlone && (
+            <Button size="lg" variant="outline" onClick={onCopyId}>
+              <Users className="h-5 w-5" /> Copy household ID
+            </Button>
+          )}
+        </FadeIn>
+      </div>
+
+      {/* What you'll see preview */}
+      <FadeIn delay={0.5}>
+        <div className="text-center mb-3">
+          <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground font-medium">
+            What you&apos;ll see here
+          </div>
+        </div>
+        <StaggerChildren
+          className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+          delay={0.08}
+          initialDelay={0.55}
+        >
+          <StaggerItem>
+            <PreviewCard
+              icon={<Wallet className="h-5 w-5" />}
+              title="Real-time net saved"
+              description="Your income minus expenses, animated, with savings rate"
+            />
+          </StaggerItem>
+          <StaggerItem>
+            <PreviewCard
+              icon={<PieChart className="h-5 w-5" />}
+              title="Where money goes"
+              description="Beautiful breakdown by category with budget alerts"
+            />
+          </StaggerItem>
+          <StaggerItem>
+            <PreviewCard
+              icon={<TrendingUp className="h-5 w-5" />}
+              title="Investments tracking"
+              description="Portfolio P&L, monthly contributions, allocation"
+            />
+          </StaggerItem>
+        </StaggerChildren>
+      </FadeIn>
+
+      {/* Quick start checklist */}
+      <FadeIn delay={0.7} className="mt-8">
+        <Card className="surface">
+          <CardContent className="p-5">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-3">
+              3-step setup
+            </div>
+            <div className="space-y-2.5">
+              <Step
+                num={1}
+                done={false}
+                title="Log a transaction"
+                description="Tap the big + button to log an expense, income or investment. Try a recent one."
+                action={
+                  <Button asChild size="sm">
+                    <Link href="/add">
+                      <Plus className="h-4 w-4" /> Add now
+                    </Link>
+                  </Button>
+                }
+              />
+              <Step
+                num={2}
+                done={false}
+                title="Set monthly budgets"
+                description="Optional — tap any category to set a limit and get alerts."
+                action={
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/budgets">
+                      <PieChart className="h-4 w-4" /> Budgets
+                    </Link>
+                  </Button>
+                }
+              />
+              <Step
+                num={3}
+                done={!isAlone}
+                title="Invite your partner"
+                description={
+                  isAlone
+                    ? "Tap to copy your household ID. Send it to them — they sign in, pick Join existing, paste."
+                    : `${members.length} members in this household — you're set.`
+                }
+                action={
+                  isAlone ? (
+                    <Button size="sm" variant="outline" onClick={onCopyId}>
+                      <Users className="h-4 w-4" /> Copy ID
+                    </Button>
+                  ) : null
+                }
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </FadeIn>
+
+      {/* Tip */}
+      <FadeIn delay={0.85} className="mt-6 text-center">
+        <div className="inline-flex items-center gap-2 text-xs text-muted-foreground bg-card/60 backdrop-blur border rounded-full px-3 py-1.5">
+          <Camera className="h-3.5 w-3.5 text-primary" />
+          Tip: snap a photo of bills directly when logging — they&apos;re saved with the transaction
+        </div>
+      </FadeIn>
+    </PageMotion>
+  );
+}
+
+function PreviewCard({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-xl border bg-card/60 backdrop-blur p-4 h-full">
+      <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary grid place-items-center mb-2.5">
+        {icon}
+      </div>
+      <div className="font-medium text-sm leading-tight">{title}</div>
+      <div className="text-xs text-muted-foreground mt-1 leading-relaxed">{description}</div>
+    </div>
   );
 }
 
@@ -421,18 +570,18 @@ function Step({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-start gap-3 p-3 rounded-lg bg-background/60 border">
+    <div className="flex items-start gap-3 p-3 rounded-lg bg-background/40 border border-border/60">
       <div
         className={
           "h-6 w-6 rounded-full grid place-items-center text-xs font-semibold shrink-0 " +
-          (done ? "bg-success/20 text-success" : "bg-primary/20 text-primary")
+          (done ? "bg-success/20 text-success" : "bg-primary/15 text-primary")
         }
       >
         {done ? "✓" : num}
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium">{title}</div>
-        <div className="text-xs text-muted-foreground">{description}</div>
+        <div className="text-xs text-muted-foreground leading-relaxed">{description}</div>
       </div>
       {action}
     </div>
