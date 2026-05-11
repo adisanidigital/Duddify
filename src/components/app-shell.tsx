@@ -40,32 +40,48 @@ import { useHousehold, useProfile, useSession } from "@/lib/hooks/use-household"
 import { PrivacyToggle } from "@/components/private-value";
 import { BiometricGate } from "@/components/biometric-gate";
 import { CommandPalette } from "@/components/command-palette";
+import { useFeatureFlags } from "@/lib/feature-flags";
 import { toast } from "sonner";
+import { Target } from "lucide-react";
 
-const NAV = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon: any;
+  /** If set, item is hidden unless this feature-flag key is enabled. */
+  requiresFlag?: "ai" | "goals" | "investments";
+};
+
+const NAV: NavItem[] = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/expenses", label: "Expenses", icon: Receipt },
-  { href: "/investments", label: "Investments", icon: TrendingUp },
+  { href: "/investments", label: "Investments", icon: TrendingUp, requiresFlag: "investments" },
   { href: "/income", label: "Income", icon: Wallet },
   { href: "/budgets", label: "Budgets", icon: PieChart },
+  { href: "/goals", label: "Goals", icon: Target, requiresFlag: "goals" },
   { href: "/yearly", label: "Yearly", icon: CalendarDays },
   { href: "/reports", label: "Reports", icon: FileBarChart },
 ];
 
-const SECONDARY = [
+const SECONDARY: NavItem[] = [
   { href: "/transactions", label: "All transactions", icon: ListOrdered },
   { href: "/categories", label: "Categories", icon: Tag },
   { href: "/recurring", label: "Recurring", icon: Repeat },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-const MOBILE_NAV = [
+const MOBILE_NAV: (NavItem & { primary?: boolean })[] = [
   { href: "/", label: "Home", icon: LayoutDashboard },
   { href: "/expenses", label: "Spend", icon: Receipt },
   { href: "/add", label: "Add", icon: Plus, primary: true },
-  { href: "/investments", label: "Invest", icon: TrendingUp },
+  { href: "/investments", label: "Invest", icon: TrendingUp, requiresFlag: "investments" },
   { href: "/transactions", label: "All", icon: ListOrdered },
 ];
+
+/** Returns only nav items whose required flag is enabled (or no flag). */
+function visibleItems<T extends NavItem>(items: T[], flags: Record<string, boolean>): T[] {
+  return items.filter((item) => !item.requiresFlag || flags[item.requiresFlag]);
+}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -74,6 +90,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { data: session, isLoading: sLoading } = useSession();
   const { data: profile, isLoading: pLoading } = useProfile();
   const { data: household, isLoading: hLoading } = useHousehold();
+  const { flags } = useFeatureFlags();
+  const visibleNav = React.useMemo(() => visibleItems(NAV, flags as any), [flags]);
+  const visibleMobile = React.useMemo(
+    () => visibleItems(MOBILE_NAV, flags as any),
+    [flags]
+  );
 
   const ready = !sLoading && !pLoading && !hLoading;
 
@@ -148,7 +170,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="px-2 py-1.5 text-[11px] uppercase tracking-wider text-muted-foreground">
             Dashboards
           </div>
-          {NAV.map((item) => (
+          {visibleNav.map((item) => (
             <NavLink key={item.href} {...item} active={pathname === item.href} />
           ))}
           <div className="px-2 pt-4 pb-1.5 text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -228,28 +250,42 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main className="flex-1 pb-28 md:pb-6">{children}</main>
 
         {/* Mobile bottom nav with iOS-style sliding pill */}
-        <MobileBottomNav pathname={pathname} />
+        <MobileBottomNav pathname={pathname} items={visibleMobile} />
       </div>
     </div>
     </BiometricGate>
   );
 }
 
-function MobileBottomNav({ pathname }: { pathname: string }) {
-  const activeIdx = MOBILE_NAV.findIndex((i) => i.href === pathname && !i.primary);
+function MobileBottomNav({
+  pathname,
+  items,
+}: {
+  pathname: string;
+  items: (NavItem & { primary?: boolean })[];
+}) {
+  const cols = items.length;
+  const colPct = 100 / Math.max(1, cols);
+  const activeIdx = items.findIndex((i) => i.href === pathname && !i.primary);
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t glass-strong safe-bottom">
-      <div className="grid grid-cols-5 relative">
+      <div
+        className="relative"
+        style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+      >
         {/* Sliding active indicator */}
         {activeIdx >= 0 && (
           <motion.div
             layoutId="bottom-nav-pill"
-            className="absolute top-1.5 bottom-1.5 w-[18%] rounded-xl bg-primary/10 ring-1 ring-primary/20 pointer-events-none"
-            style={{ left: `${activeIdx * 20 + 1}%` }}
+            className="absolute top-1.5 bottom-1.5 rounded-xl bg-primary/10 ring-1 ring-primary/20 pointer-events-none"
+            style={{
+              left: `${activeIdx * colPct + 1}%`,
+              width: `${colPct - 2}%`,
+            }}
             transition={{ type: "spring", stiffness: 380, damping: 30 }}
           />
         )}
-        {MOBILE_NAV.map((item) => {
+        {items.map((item) => {
           const active = pathname === item.href;
           if (item.primary) {
             return (
@@ -288,6 +324,8 @@ function MobileDrawer() {
   const pathname = usePathname();
   const { data: profile } = useProfile();
   const { data: household } = useHousehold();
+  const { flags } = useFeatureFlags();
+  const visibleNav = React.useMemo(() => visibleItems(NAV, flags as any), [flags]);
 
   const copyHouseholdId = () => {
     if (!household) return;
@@ -320,7 +358,7 @@ function MobileDrawer() {
         <div className="px-2 py-1.5 text-[11px] uppercase tracking-wider text-muted-foreground">
           Dashboards
         </div>
-        {NAV.map((item) => (
+        {visibleNav.map((item) => (
           <DrawerLink key={item.href} {...item} active={pathname === item.href} />
         ))}
 

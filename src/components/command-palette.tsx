@@ -28,14 +28,37 @@ import {
   Eye,
   EyeOff,
   Search,
+  Target,
 } from "lucide-react";
+import { useFeatureFlags } from "@/lib/feature-flags";
 
-const NAV: { href: string; label: string; keywords: string[]; icon: any }[] = [
+type NavEntry = {
+  href: string;
+  label: string;
+  keywords: string[];
+  icon: any;
+  requiresFlag?: "ai" | "goals" | "investments";
+};
+
+const NAV: NavEntry[] = [
   { href: "/", label: "Overview", keywords: ["home", "dashboard"], icon: LayoutDashboard },
   { href: "/expenses", label: "Expenses", keywords: ["spend", "spending"], icon: Receipt },
   { href: "/income", label: "Income", keywords: ["earn", "salary"], icon: Wallet },
-  { href: "/investments", label: "Investments", keywords: ["portfolio", "stocks", "mf"], icon: TrendingUp },
+  {
+    href: "/investments",
+    label: "Investments",
+    keywords: ["portfolio", "stocks", "mf"],
+    icon: TrendingUp,
+    requiresFlag: "investments",
+  },
   { href: "/budgets", label: "Budgets", keywords: ["limit", "monthly"], icon: PieChart },
+  {
+    href: "/goals",
+    label: "Goals",
+    keywords: ["save", "savings", "target", "plan"],
+    icon: Target,
+    requiresFlag: "goals",
+  },
   { href: "/yearly", label: "Yearly", keywords: ["year"], icon: CalendarDays },
   { href: "/reports", label: "Reports", keywords: ["report", "analytics"], icon: FileBarChart },
   { href: "/transactions", label: "All transactions", keywords: ["list"], icon: ListOrdered },
@@ -52,7 +75,12 @@ export function CommandPalette() {
   const { data: txs = [] } = useTransactions({ limit: 100 });
   const { data: categories = [] } = useCategories();
   const { hidden, toggle: togglePrivacy } = usePrivacy();
+  const { flags } = useFeatureFlags();
   const { theme, setTheme } = useTheme();
+  const visibleNav = React.useMemo(
+    () => NAV.filter((n) => !n.requiresFlag || (flags as any)[n.requiresFlag]),
+    [flags]
+  );
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -137,7 +165,7 @@ export function CommandPalette() {
               heading="Jump to"
               className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1.5"
             >
-              {NAV.map((n) => (
+              {visibleNav.map((n) => (
                 <Item
                   key={n.href}
                   onSelect={() => go(n.href)}

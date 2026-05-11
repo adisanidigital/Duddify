@@ -44,13 +44,16 @@ export function TransactionForm({
   const { data: household } = useHousehold();
   const { data: members = [] } = useHouseholdMembers();
   const { data: categories = [] } = useCategories();
-  // Recent history for smart-category suggestion (last ~6 months is enough)
-  const recentFrom = React.useMemo(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 6);
-    return isoDate(d);
-  }, []);
-  const { data: historyTxs = [] } = useTransactions({ from: recentFrom });
+  // Use the SAME from-date that Overview uses (current year start) so we read
+  // straight from React Query's cache and never block the Add page on a fresh
+  // Supabase round-trip. If the user lands on /add as their first page, the
+  // query still resolves in the background — the form just renders without
+  // smart suggestions until then.
+  const yearStart = React.useMemo(
+    () => isoDate(new Date(new Date().getFullYear(), 0, 1)),
+    []
+  );
+  const { data: historyTxs = [] } = useTransactions({ from: yearStart });
 
   const [type, setType] = React.useState<TxType>((initial?.type as TxType) ?? "expense");
   const [amount, setAmount] = React.useState<string>(
@@ -77,28 +80,23 @@ export function TransactionForm({
     setCategoryId(filteredCats[0]?.id ?? "");
   }, [type, filteredCats, categoryId]);
 
-  // Smart category suggestion driven by note text + history
-  const [suggested, setSuggested] = React.useState<Category | null>(null);
+  // Smart category suggestion — purely derived, no extra render cycle.
+  // Suppressed for 1.4s after acceptance so the banner doesn't reappear
+  // while we celebrate, and never fires for short notes (<3 chars).
   const [acceptedSuggestion, setAcceptedSuggestion] = React.useState(false);
-  React.useEffect(() => {
-    if (!note || note.trim().length < 3) {
-      setSuggested(null);
-      return;
-    }
+  const [dismissedSuggestion, setDismissedSuggestion] = React.useState<string | null>(null);
+  const suggested = React.useMemo<Category | null>(() => {
+    if (!note || note.trim().length < 3) return null;
+    if (acceptedSuggestion) return null;
     const id = suggestCategory(note, type, historyTxs, categories);
-    if (!id || id === categoryId) {
-      setSuggested(null);
-      return;
-    }
-    const c = categories.find((x) => x.id === id) ?? null;
-    setSuggested(c);
-  }, [note, type, historyTxs, categories, categoryId]);
+    if (!id || id === categoryId || id === dismissedSuggestion) return null;
+    return categories.find((x) => x.id === id) ?? null;
+  }, [note, type, historyTxs, categories, categoryId, acceptedSuggestion, dismissedSuggestion]);
 
   const acceptSuggestion = () => {
     if (!suggested) return;
     setCategoryId(suggested.id);
     setAcceptedSuggestion(true);
-    setSuggested(null);
     setTimeout(() => setAcceptedSuggestion(false), 1400);
   };
 
@@ -592,7 +590,7 @@ export function TransactionForm({
               </Button>
               <button
                 type="button"
-                onClick={() => setSuggested(null)}
+                onClick={() => suggested && setDismissedSuggestion(suggested.id)}
                 className="text-muted-foreground hover:text-foreground"
                 aria-label="Dismiss suggestion"
               >

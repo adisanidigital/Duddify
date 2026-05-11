@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/page-header";
 import { KpiCard } from "@/components/kpi-card";
 import { TransactionRow } from "@/components/transaction-row";
 import { CategoryPie } from "@/components/charts";
+import { CategoryDetailDialog } from "@/components/category-detail-dialog";
 import {
   PageMotion,
   FadeIn,
@@ -87,6 +88,13 @@ export default function OverviewPage() {
         .reduce((s, c) => s + Number(c.monthly_budget), 0),
     [categories]
   );
+
+  // Category drill-down: click any row in Top expenses / wedge to see its txs
+  const [drillCategory, setDrillCategory] = React.useState<typeof categories[number] | null>(null);
+  const monthLabelLong = startOfMonth().toLocaleString(locale, {
+    month: "long",
+    year: "numeric",
+  });
 
   const recent = txs.slice(0, 6);
   const catById = new Map(categories.map((c) => [c.id, c] as const));
@@ -354,9 +362,18 @@ export default function OverviewPage() {
                 {topExpenses.map(({ category, total }) => {
                   const pctOfTotal = pct(total, curSums.expense);
                   return (
-                    <div key={category.id}>
+                    <button
+                      key={category.id}
+                      type="button"
+                      onClick={() => setDrillCategory(category)}
+                      className="w-full text-left rounded-lg p-2 -m-2 hover:bg-accent/60 active:bg-accent transition-colors group"
+                      aria-label={`See transactions in ${category.name}`}
+                    >
                       <div className="flex justify-between text-sm mb-1">
-                        <span className="font-medium">{category.name}</span>
+                        <span className="font-medium inline-flex items-center gap-1.5">
+                          {category.name}
+                          <ArrowRight className="h-3 w-3 text-muted-foreground opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                        </span>
                         <span className="tabular-nums">
                           <PrivateValue mask="••••">
                             {formatCurrency(total, currency, locale)}
@@ -370,7 +387,7 @@ export default function OverviewPage() {
                           style={{ width: `${pctOfTotal}%`, background: category.color }}
                         />
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -455,6 +472,17 @@ export default function OverviewPage() {
           locale={locale}
         />
       </div>
+
+      <CategoryDetailDialog
+        open={!!drillCategory}
+        onOpenChange={(v) => !v && setDrillCategory(null)}
+        category={drillCategory}
+        txs={cur}
+        members={members}
+        currency={currency}
+        locale={locale}
+        windowLabel={monthLabelLong}
+      />
     </PageMotion>
   );
 }

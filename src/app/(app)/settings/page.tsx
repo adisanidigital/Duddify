@@ -24,6 +24,7 @@ import { formatCurrency, isoDate } from "@/lib/utils";
 import { PageMotion } from "@/components/motion";
 import { ReminderCard } from "@/components/reminder-card";
 import { SecuritySettings } from "@/components/security-settings";
+import { FeatureFlagsSettings } from "@/components/feature-flags-settings";
 
 const CURRENCIES = [
   { code: "INR", locale: "en-IN" },
@@ -258,6 +259,8 @@ export default function SettingsPage() {
       </Card>
 
       <SecuritySettings userLabel={profile?.display_name ?? profile?.email} />
+
+      <FeatureFlagsSettings />
 
       <Card>
         <CardHeader>

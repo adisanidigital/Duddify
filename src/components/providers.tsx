@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import { ColorThemeProvider } from "@/components/color-theme";
 import { PrivacyProvider } from "@/lib/privacy";
+import { FeatureFlagsProvider } from "@/lib/feature-flags";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [client] = React.useState(
@@ -24,10 +25,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <NextThemesProvider attribute="class" defaultTheme="system" enableSystem>
       <ColorThemeProvider>
         <PrivacyProvider>
-          <QueryClientProvider client={client}>
-            {children}
-            <Toaster richColors position="top-center" closeButton />
-          </QueryClientProvider>
+          <FeatureFlagsProvider>
+            <QueryClientProvider client={client}>
+              {children}
+              <Toaster richColors position="top-center" closeButton />
+            </QueryClientProvider>
+          </FeatureFlagsProvider>
         </PrivacyProvider>
       </ColorThemeProvider>
     </NextThemesProvider>
