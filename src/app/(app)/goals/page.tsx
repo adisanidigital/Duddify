@@ -40,6 +40,7 @@ import {
 } from "@/lib/goals";
 import { useFeatureFlags } from "@/lib/feature-flags";
 import { aiGoalAdvice } from "@/lib/ai";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Plus,
   Target,
@@ -76,6 +77,7 @@ export default function GoalsPage() {
 
   const [editing, setEditing] = React.useState<Partial<Goal> | null>(null);
   const [tab, setTab] = React.useState<"all" | GoalHorizon>("all");
+  const confirmDialog = useConfirmDialog();
 
   const avgSavings = React.useMemo(() => avgMonthlyNetSavings(txs, 6), [txs]);
   const grouped = React.useMemo(() => {
@@ -98,15 +100,36 @@ export default function GoalsPage() {
     if (!hh?.id) return;
     const removed = goals.find((g) => g.id === id);
     if (!removed) return;
-    setGoals(deleteGoal(hh.id, id));
-    toast.success(`Deleted "${removed.title}"`, {
-      duration: 8000,
-      action: {
-        label: "Undo",
-        onClick: () => {
-          if (!hh?.id) return;
-          setGoals(upsertGoal(hh.id, removed));
-        },
+    confirmDialog({
+      title: `Delete "${removed.title}"?`,
+      description: (
+        <>
+          Target {formatCurrency(removed.target, currency, locale)} ·
+          {" "}deadline{" "}
+          {new Date(removed.deadline).toLocaleDateString(locale, {
+            month: "short",
+            year: "numeric",
+          })}
+          <br />
+          <span className="text-muted-foreground">
+            You&apos;ll have 8 seconds to undo right after.
+          </span>
+        </>
+      ),
+      confirmLabel: "Delete",
+      onConfirm: () => {
+        if (!hh?.id) return;
+        setGoals(deleteGoal(hh.id, id));
+        toast.success(`Deleted "${removed.title}"`, {
+          duration: 8000,
+          action: {
+            label: "Undo",
+            onClick: () => {
+              if (!hh?.id) return;
+              setGoals(upsertGoal(hh.id, removed));
+            },
+          },
+        });
       },
     });
   };
@@ -226,6 +249,8 @@ export default function GoalsPage() {
         onSave={saveGoal}
         currency={currency}
       />
+
+      {confirmDialog.element}
     </PageMotion>
   );
 }

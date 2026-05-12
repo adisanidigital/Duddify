@@ -25,6 +25,7 @@ import { PageMotion } from "@/components/motion";
 import { ReminderCard } from "@/components/reminder-card";
 import { SecuritySettings } from "@/components/security-settings";
 import { FeatureFlagsSettings } from "@/components/feature-flags-settings";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const CURRENCIES = [
   { code: "INR", locale: "en-IN" },
@@ -58,6 +59,7 @@ export default function SettingsPage() {
   const [editingName, setEditingName] = React.useState(false);
   const [nickname, setNickname] = React.useState(profile?.display_name ?? "");
   const [savingNickname, setSavingNickname] = React.useState(false);
+  const confirmDialog = useConfirmDialog();
 
   React.useEffect(() => {
     if (hh) {
@@ -87,12 +89,29 @@ export default function SettingsPage() {
     setEditingName(false);
   };
 
-  const removeMember = async (userId: string, displayName: string | null) => {
-    if (!confirm(`Remove ${displayName ?? "this member"} from the household? Their transactions will stay, but they'll no longer have access.`)) return;
-    const { error } = await supabase.rpc("remove_household_member", { p_user_id: userId });
-    if (error) return toast.error(error.message);
-    qc.invalidateQueries({ queryKey: ["members"] });
-    toast.success("Member removed");
+  const removeMember = (userId: string, displayName: string | null) => {
+    confirmDialog({
+      title: `Remove ${displayName ?? "this member"}?`,
+      description: (
+        <>
+          Their transactions stay in the household, but they&apos;ll no longer
+          have access.
+          <br />
+          <span className="text-muted-foreground">
+            They can rejoin later with the household ID.
+          </span>
+        </>
+      ),
+      confirmLabel: "Remove",
+      onConfirm: async () => {
+        const { error } = await supabase.rpc("remove_household_member", {
+          p_user_id: userId,
+        });
+        if (error) return toast.error(error.message);
+        qc.invalidateQueries({ queryKey: ["members"] });
+        toast.success("Member removed");
+      },
+    });
   };
 
   // Inline edit a household member's nickname (shared across household)
@@ -125,11 +144,25 @@ export default function SettingsPage() {
     cancelEditMember();
   };
 
-  const leaveHousehold = async () => {
-    if (!confirm("Leave this household? You'll need a new household ID to rejoin.")) return;
-    const { error } = await supabase.rpc("leave_household");
-    if (error) return toast.error(error.message);
-    if (typeof window !== "undefined") window.location.replace("/onboarding");
+  const leaveHousehold = () => {
+    confirmDialog({
+      title: "Leave this household?",
+      description: (
+        <>
+          You&apos;ll lose access to all the shared transactions and dashboards.
+          <br />
+          <span className="text-muted-foreground">
+            You can rejoin later with the household ID.
+          </span>
+        </>
+      ),
+      confirmLabel: "Leave",
+      onConfirm: async () => {
+        const { error } = await supabase.rpc("leave_household");
+        if (error) return toast.error(error.message);
+        if (typeof window !== "undefined") window.location.replace("/onboarding");
+      },
+    });
   };
 
   const updateHousehold = async () => {
@@ -462,6 +495,8 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {confirmDialog.element}
     </PageMotion>
   );
 }

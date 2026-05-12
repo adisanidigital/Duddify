@@ -18,6 +18,7 @@ import { Plus, Trash2, Pause, Play } from "lucide-react";
 import { toast } from "sonner";
 import { formatCurrency, isoDate } from "@/lib/utils";
 import { PageMotion } from "@/components/motion";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 
 function useRecurring() {
   const supabase = createClient();
@@ -274,6 +275,7 @@ function RuleDialog() {
 function RuleActions({ rule }: { rule: RecurringRule }) {
   const supabase = createClient();
   const qc = useQueryClient();
+  const confirmDialog = useConfirmDialog();
 
   const toggle = async () => {
     const { error } = await supabase
@@ -284,21 +286,60 @@ function RuleActions({ rule }: { rule: RecurringRule }) {
     qc.invalidateQueries({ queryKey: ["recurring"] });
   };
 
-  const remove = async () => {
-    if (!confirm("Delete this rule?")) return;
+  const performDelete = async () => {
     const { error } = await supabase.from("recurring_rules").delete().eq("id", rule.id);
-    if (error) return toast.error(error.message);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     qc.invalidateQueries({ queryKey: ["recurring"] });
+    toast.success("Rule deleted", {
+      duration: 8000,
+      action: {
+        label: "Undo",
+        onClick: async () => {
+          const { id: _id, ...payload } = rule;
+          const { error: e2 } = await supabase
+            .from("recurring_rules")
+            .insert(payload);
+          if (e2) {
+            toast.error(e2.message);
+          } else {
+            toast.success("Restored");
+            qc.invalidateQueries({ queryKey: ["recurring"] });
+          }
+        },
+      },
+    });
   };
+
+  const askDelete = () =>
+    confirmDialog({
+      title: "Delete this recurring rule?",
+      description: (
+        <>
+          {rule.note ?? "Recurring rule"} · runs {rule.frequency} for{" "}
+          {String(rule.amount)}
+          <br />
+          <span className="text-muted-foreground">
+            New transactions stop being auto-created. Past ones stay. You&apos;ll
+            have 8 seconds to undo.
+          </span>
+        </>
+      ),
+      confirmLabel: "Delete rule",
+      onConfirm: performDelete,
+    });
 
   return (
     <div className="flex gap-1">
       <Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle">
         {rule.active ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
       </Button>
-      <Button variant="ghost" size="icon" onClick={remove} aria-label="Delete">
+      <Button variant="ghost" size="icon" onClick={askDelete} aria-label="Delete">
         <Trash2 className="h-4 w-4 text-muted-foreground" />
       </Button>
+      {confirmDialog.element}
     </div>
   );
 }

@@ -21,6 +21,9 @@ import type { Category, Profile, Transaction } from "@/lib/types";
  *
  * Pass `txs` already filtered to your visible date window (e.g. current
  * month). The dialog will further filter by category and sort by date desc.
+ *
+ * Each row is a button if `onSelectTransaction` is provided — useful for
+ * stacking the row's full TransactionDetailDialog on top.
  */
 export function CategoryDetailDialog({
   open,
@@ -31,6 +34,7 @@ export function CategoryDetailDialog({
   currency = "INR",
   locale = "en-IN",
   windowLabel,
+  onSelectTransaction,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -41,6 +45,7 @@ export function CategoryDetailDialog({
   locale?: string;
   /** Optional human label of the time window e.g. "May 2026" */
   windowLabel?: string;
+  onSelectTransaction?: (tx: Transaction) => void;
 }) {
   const inCategory = React.useMemo(() => {
     if (!category) return [] as Transaction[];
@@ -137,13 +142,23 @@ export function CategoryDetailDialog({
                         const adder = memberById.get(t.user_id);
                         const payer = t.paid_by ? memberById.get(t.paid_by) : null;
                         const note = t.note?.trim();
+                        const interactive = !!onSelectTransaction;
+                        const Wrapper: any = interactive ? motion.button : motion.div;
                         return (
-                          <motion.div
+                          <Wrapper
                             key={t.id}
+                            type={interactive ? "button" : undefined}
+                            onClick={
+                              interactive ? () => onSelectTransaction!(t) : undefined
+                            }
                             initial={{ opacity: 0, y: 4 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.18 }}
-                            className="px-2 py-2.5"
+                            className={cn(
+                              "px-2 py-2.5 text-left w-full",
+                              interactive &&
+                                "transition-colors hover:bg-accent/60 active:bg-accent"
+                            )}
                           >
                             <div className="flex items-start gap-2.5">
                               <div className="flex-1 min-w-0">
@@ -181,7 +196,7 @@ export function CategoryDetailDialog({
                                 </PrivateValue>
                               </div>
                             </div>
-                          </motion.div>
+                          </Wrapper>
                         );
                       })}
                     </div>

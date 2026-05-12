@@ -18,6 +18,7 @@ import type { Category, TxType } from "@/lib/types";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageMotion } from "@/components/motion";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn, formatCurrency } from "@/lib/utils";
 
 const COLORS = [
@@ -99,25 +100,70 @@ function CategoryRow({
           <Pencil className="h-4 w-4" />
         </Button>
       } />
-      <DeleteCategoryButton id={c.id} />
+      <DeleteCategoryButton category={c} />
     </div>
   );
 }
 
-function DeleteCategoryButton({ id }: { id: string }) {
+function DeleteCategoryButton({ category }: { category: Category }) {
   const supabase = createClient();
   const qc = useQueryClient();
-  const remove = async () => {
-    if (!confirm("Delete this category? Existing transactions will keep their reference.")) return;
-    const { error } = await supabase.from("categories").update({ archived: true }).eq("id", id);
-    if (error) return toast.error(error.message);
+  const confirmDialog = useConfirmDialog();
+
+  const performDelete = async () => {
+    const { error } = await supabase
+      .from("categories")
+      .update({ archived: true })
+      .eq("id", category.id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     qc.invalidateQueries({ queryKey: ["categories"] });
-    toast.success("Archived");
+    toast.success(`Archived "${category.name}"`, {
+      duration: 8000,
+      action: {
+        label: "Undo",
+        onClick: async () => {
+          const { error: e2 } = await supabase
+            .from("categories")
+            .update({ archived: false })
+            .eq("id", category.id);
+          if (e2) {
+            toast.error(e2.message);
+          } else {
+            toast.success("Restored");
+            qc.invalidateQueries({ queryKey: ["categories"] });
+          }
+        },
+      },
+    });
   };
+
+  const askDelete = () =>
+    confirmDialog({
+      title: `Delete "${category.name}"?`,
+      description: (
+        <>
+          The category will be archived. Existing transactions keep their
+          reference and stay visible.
+          <br />
+          <span className="text-muted-foreground">
+            You&apos;ll have 8 seconds to undo right after.
+          </span>
+        </>
+      ),
+      confirmLabel: "Delete",
+      onConfirm: performDelete,
+    });
+
   return (
-    <Button variant="ghost" size="icon" onClick={remove} aria-label="Delete">
-      <Trash2 className="h-4 w-4 text-muted-foreground" />
-    </Button>
+    <>
+      <Button variant="ghost" size="icon" onClick={askDelete} aria-label="Delete">
+        <Trash2 className="h-4 w-4 text-muted-foreground" />
+      </Button>
+      {confirmDialog.element}
+    </>
   );
 }
 

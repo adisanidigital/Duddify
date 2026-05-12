@@ -9,6 +9,11 @@ import { KpiCard } from "@/components/kpi-card";
 import { TransactionRow } from "@/components/transaction-row";
 import { CategoryPie } from "@/components/charts";
 import { CategoryDetailDialog } from "@/components/category-detail-dialog";
+import { TransactionDetailDialog } from "@/components/transaction-detail-dialog";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import { createClient } from "@/lib/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import type { Transaction } from "@/lib/types";
 import {
   PageMotion,
   FadeIn,
@@ -89,15 +94,79 @@ export default function OverviewPage() {
     [categories]
   );
 
+  const catById = React.useMemo(
+    () => new Map(categories.map((c) => [c.id, c] as const)),
+    [categories]
+  );
+
   // Category drill-down: click any row in Top expenses / wedge to see its txs
   const [drillCategory, setDrillCategory] = React.useState<typeof categories[number] | null>(null);
+  const [drillTx, setDrillTx] = React.useState<Transaction | null>(null);
   const monthLabelLong = startOfMonth().toLocaleString(locale, {
     month: "long",
     year: "numeric",
   });
 
+  // Delete-with-confirm-and-undo for the transaction detail card
+  const supabase = createClient();
+  const qc = useQueryClient();
+  const confirmDialog = useConfirmDialog();
+  const drillTxFresh = React.useMemo(
+    () => (drillTx ? txs.find((t) => t.id === drillTx.id) ?? null : null),
+    [drillTx, txs]
+  );
+
+  const askDeleteTx = React.useCallback(
+    (tx: Transaction) => {
+      const c = catById.get(tx.category_id);
+      const amountStr = formatCurrency(Number(tx.amount), currency, locale);
+      confirmDialog({
+        title: "Delete this transaction?",
+        description: (
+          <>
+            <span className="font-medium text-foreground">
+              {c?.name ?? "Uncategorised"}
+            </span>{" "}
+            · {amountStr}
+            <br />
+            <span className="text-muted-foreground">
+              You&apos;ll have 8 seconds to undo right after.
+            </span>
+          </>
+        ),
+        confirmLabel: "Delete",
+        onConfirm: async () => {
+          const { error } = await supabase
+            .from("transactions")
+            .delete()
+            .eq("id", tx.id);
+          if (error) return toast.error(error.message);
+          qc.invalidateQueries({ queryKey: ["transactions"] });
+          toast.success(`Deleted${c ? ` "${c.name}"` : ""}`, {
+            duration: 8000,
+            action: {
+              label: "Undo",
+              onClick: async () => {
+                const { id: _id, created_at: _ca, ...payload } = tx;
+                const { error: e2 } = await supabase
+                  .from("transactions")
+                  .insert(payload);
+                if (e2) toast.error(e2.message);
+                else {
+                  toast.success("Restored");
+                  qc.invalidateQueries({ queryKey: ["transactions"] });
+                }
+              },
+            },
+          });
+          setDrillTx(null);
+        },
+      });
+    },
+    [confirmDialog, catById, currency, locale, supabase, qc]
+  );
+
   const recent = txs.slice(0, 6);
-  const catById = new Map(categories.map((c) => [c.id, c] as const));
   const monthLabel = startOfMonth().toLocaleString(locale, { month: "long", year: "numeric" });
 
   const isFirstRun = !isLoading && txs.length === 0;
@@ -482,7 +551,21 @@ export default function OverviewPage() {
         currency={currency}
         locale={locale}
         windowLabel={monthLabelLong}
+        onSelectTransaction={setDrillTx}
       />
+
+      <TransactionDetailDialog
+        open={!!drillTxFresh}
+        onOpenChange={(v) => !v && setDrillTx(null)}
+        tx={drillTxFresh}
+        category={drillTxFresh ? catById.get(drillTxFresh.category_id) : null}
+        members={members}
+        currency={currency}
+        locale={locale}
+        onDelete={() => drillTxFresh && askDeleteTx(drillTxFresh)}
+      />
+
+      {confirmDialog.element}
     </PageMotion>
   );
 }

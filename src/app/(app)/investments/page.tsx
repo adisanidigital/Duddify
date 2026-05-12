@@ -12,6 +12,7 @@ import { CategoryPie, MonthBars, TrendArea } from "@/components/charts";
 import { useCategories, useHoldings, useTransactions } from "@/lib/hooks/use-data";
 import { useHousehold } from "@/lib/hooks/use-household";
 import { PageMotion } from "@/components/motion";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { groupByCategory, groupByMonth } from "@/lib/analytics";
 import { xirr } from "@/lib/insights";
 import { formatCurrency, isoDate, pct } from "@/lib/utils";
@@ -384,12 +385,17 @@ function HoldingDialog({ initial }: { initial?: any } = {}) {
 function HoldingActions({ holding }: { holding: any }) {
   const supabase = createClient();
   const qc = useQueryClient();
-  const remove = async () => {
+  const confirmDialog = useConfirmDialog();
+
+  const performDelete = async () => {
     const { error } = await supabase
       .from("investment_holdings")
       .delete()
       .eq("id", holding.id);
-    if (error) return toast.error(error.message);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     qc.invalidateQueries({ queryKey: ["holdings"] });
     toast.success(`Deleted "${holding.name}"`, {
       duration: 8000,
@@ -410,9 +416,29 @@ function HoldingActions({ holding }: { holding: any }) {
       },
     });
   };
+
+  const askDelete = () =>
+    confirmDialog({
+      title: `Delete "${holding.name}"?`,
+      description: (
+        <>
+          This removes the holding from your portfolio.
+          <br />
+          <span className="text-muted-foreground">
+            You&apos;ll have 8 seconds to undo right after.
+          </span>
+        </>
+      ),
+      confirmLabel: "Delete",
+      onConfirm: performDelete,
+    });
+
   return (
-    <Button variant="ghost" size="icon" onClick={remove}>
-      <Trash2 className="h-4 w-4 text-muted-foreground" />
-    </Button>
+    <>
+      <Button variant="ghost" size="icon" onClick={askDelete}>
+        <Trash2 className="h-4 w-4 text-muted-foreground" />
+      </Button>
+      {confirmDialog.element}
+    </>
   );
 }

@@ -4,8 +4,9 @@ import * as React from "react";
 import { motion } from "motion/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ScanFace, ShieldCheck, Eye, EyeOff, Trash2 } from "lucide-react";
+import { ScanFace, ShieldCheck, Eye, EyeOff, Trash2, ShieldOff } from "lucide-react";
 import { toast } from "sonner";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   disableBiometric,
   getBiometricLabel,
@@ -21,6 +22,7 @@ export function SecuritySettings({ userLabel }: { userLabel?: string | null }) {
   const [busy, setBusy] = React.useState(false);
   const [label, setLabel] = React.useState<string | null>(null);
   const { hidden, toggle, setHidden, ready: privacyReady } = usePrivacy();
+  const confirmDialog = useConfirmDialog();
 
   React.useEffect(() => {
     isBiometricAvailable().then(setSupported);
@@ -42,14 +44,31 @@ export function SecuritySettings({ userLabel }: { userLabel?: string | null }) {
     }
   };
 
-  const disable = () => {
-    if (!confirm("Disable biometric app lock? Anyone with this device will be able to open the app.")) return;
-    disableBiometric();
-    setEnabled(false);
-    toast.success("App lock disabled");
-  };
+  const disable = () =>
+    confirmDialog({
+      title: "Disable biometric app lock?",
+      description: (
+        <>
+          Anyone with this device will be able to open the app without
+          Face&nbsp;ID / Touch&nbsp;ID.
+          <br />
+          <span className="text-muted-foreground">
+            You can re-enable it any time.
+          </span>
+        </>
+      ),
+      confirmLabel: "Disable lock",
+      tone: "warning",
+      icon: <ShieldOff className="h-6 w-6" />,
+      onConfirm: () => {
+        disableBiometric();
+        setEnabled(false);
+        toast.success("App lock disabled");
+      },
+    });
 
   return (
+    <>
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
@@ -156,5 +175,7 @@ export function SecuritySettings({ userLabel }: { userLabel?: string | null }) {
         </div>
       </CardContent>
     </Card>
+    {confirmDialog.element}
+    </>
   );
 }

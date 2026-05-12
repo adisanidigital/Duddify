@@ -35,6 +35,7 @@ export function DayDetailDialog({
   currency = "INR",
   locale = "en-IN",
   type = "expense",
+  onSelectTransaction,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -47,6 +48,8 @@ export function DayDetailDialog({
   locale?: string;
   /** Restrict to a single transaction type. Defaults to "expense". Pass null for any. */
   type?: Transaction["type"] | null;
+  /** When set, each transaction row becomes clickable. */
+  onSelectTransaction?: (tx: Transaction) => void;
 }) {
   const dayTxs = React.useMemo(() => {
     if (!date) return [] as Transaction[];
@@ -131,6 +134,7 @@ export function DayDetailDialog({
                   memberById={memberById}
                   currency={currency}
                   locale={locale}
+                  onSelectTransaction={onSelectTransaction}
                 />
               ))}
             </div>
@@ -148,6 +152,7 @@ function CategorySection({
   memberById,
   currency,
   locale,
+  onSelectTransaction,
 }: {
   category: Category | undefined;
   items: Transaction[];
@@ -155,6 +160,7 @@ function CategorySection({
   memberById: Map<string, Profile>;
   currency: string;
   locale: string;
+  onSelectTransaction?: (tx: Transaction) => void;
 }) {
   const color = category?.color ?? "#64748b";
   return (
@@ -189,8 +195,18 @@ function CategorySection({
           const adder = memberById.get(t.user_id);
           const payer = t.paid_by ? memberById.get(t.paid_by) : null;
           const note = t.note?.trim();
+          const interactive = !!onSelectTransaction;
+          const Wrapper: any = interactive ? "button" : "div";
           return (
-            <div key={t.id} className="px-3 py-2.5">
+            <Wrapper
+              key={t.id}
+              type={interactive ? "button" : undefined}
+              onClick={interactive ? () => onSelectTransaction!(t) : undefined}
+              className={cn(
+                "w-full text-left px-3 py-2.5",
+                interactive && "transition-colors hover:bg-accent/60 active:bg-accent"
+              )}
+            >
               <div className="flex items-start gap-2.5">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -225,7 +241,7 @@ function CategorySection({
                   </PrivateValue>
                 </div>
               </div>
-            </div>
+            </Wrapper>
           );
         })}
       </div>
