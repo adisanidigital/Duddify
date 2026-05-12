@@ -9,6 +9,7 @@ import { MonthPicker } from "@/components/month-picker";
 import { TransactionRow } from "@/components/transaction-row";
 import { PageMotion, StaggerChildren, StaggerItem } from "@/components/motion";
 import { CategoryDetailDialog } from "@/components/category-detail-dialog";
+import { DayDetailDialog } from "@/components/day-detail-dialog";
 import { useCategories, useTransactions } from "@/lib/hooks/use-data";
 import { useHousehold, useHouseholdMembers } from "@/lib/hooks/use-household";
 import type { Category } from "@/lib/types";
@@ -31,6 +32,7 @@ export default function ExpensesPage() {
   const { data: txs = [] } = useTransactions({ from, to });
   const expenses = txs.filter((t) => t.type === "expense");
   const [drillCategory, setDrillCategory] = React.useState<Category | null>(null);
+  const [drillDay, setDrillDay] = React.useState<string | null>(null);
   const windowLabel = ref.toLocaleString("default", { month: "long", year: "numeric" });
 
   const currency = hh?.currency ?? "INR";
@@ -89,10 +91,18 @@ export default function ExpensesPage() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Daily spend</CardTitle>
-            <CardDescription>Each bar is one day this month</CardDescription>
+            <CardDescription>
+              Each bar is one day this month · tap a bar to see the details
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <DailyBar data={byDay} currency={currency} locale={locale} height={240} />
+            <DailyBar
+              data={byDay}
+              currency={currency}
+              locale={locale}
+              height={240}
+              onBarClick={setDrillDay}
+            />
           </CardContent>
         </Card>
 
@@ -170,10 +180,16 @@ export default function ExpensesPage() {
         <Card>
           <CardHeader>
             <CardTitle>Calendar heatmap</CardTitle>
-            <CardDescription>Spend per day</CardDescription>
+            <CardDescription>Spend per day · tap a day to drill in</CardDescription>
           </CardHeader>
           <CardContent>
-            <CalendarHeatmap data={heat} monthRef={ref} currency={currency} locale={locale} />
+            <CalendarHeatmap
+              data={heat}
+              monthRef={ref}
+              currency={currency}
+              locale={locale}
+              onDayClick={setDrillDay}
+            />
           </CardContent>
         </Card>
       </div>
@@ -212,6 +228,18 @@ export default function ExpensesPage() {
         currency={currency}
         locale={locale}
         windowLabel={windowLabel}
+      />
+
+      <DayDetailDialog
+        open={!!drillDay}
+        onOpenChange={(v) => !v && setDrillDay(null)}
+        date={drillDay}
+        txs={expenses}
+        categories={categories}
+        members={members}
+        currency={currency}
+        locale={locale}
+        type="expense"
       />
     </PageMotion>
   );

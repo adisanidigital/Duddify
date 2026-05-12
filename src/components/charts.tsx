@@ -289,16 +289,28 @@ export function DailyBar({
   currency = "INR",
   locale = "en-IN",
   height = 200,
+  onBarClick,
 }: {
   data: { date: string; total: number }[];
   currency?: string;
   locale?: string;
   height?: number;
+  /** When set, clicking a bar fires this with the bar's date (YYYY-MM-DD). */
+  onBarClick?: (date: string) => void;
 }) {
   if (!data.length) return <Empty height={height} />;
+  const interactive = !!onBarClick;
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={data} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
+      <BarChart
+        data={data}
+        margin={{ top: 6, right: 8, left: 0, bottom: 0 }}
+        onClick={(e: any) => {
+          if (!onBarClick) return;
+          const date = e?.activePayload?.[0]?.payload?.date;
+          if (date) onBarClick(date);
+        }}
+      >
         <CartesianGrid stroke={GRID} strokeDasharray="3 3" vertical={false} />
         <XAxis
           dataKey="date"
@@ -314,8 +326,22 @@ export function DailyBar({
           tickLine={false}
           width={60}
         />
-        <Tooltip content={<ChartTooltip currency={currency} locale={locale} />} cursor={{ fill: "hsl(var(--accent))" }} />
-        <Bar dataKey="total" name="Spent" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+        <Tooltip
+          content={<ChartTooltip currency={currency} locale={locale} />}
+          cursor={{ fill: "hsl(var(--accent))" }}
+        />
+        <Bar
+          dataKey="total"
+          name="Spent"
+          fill="hsl(var(--primary))"
+          radius={[6, 6, 0, 0]}
+          style={interactive ? { cursor: "pointer" } : undefined}
+          onClick={(payload: any) => {
+            if (!onBarClick) return;
+            const date = payload?.payload?.date ?? payload?.date;
+            if (date) onBarClick(date);
+          }}
+        />
       </BarChart>
     </ResponsiveContainer>
   );

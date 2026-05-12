@@ -31,11 +31,14 @@ export function CalendarHeatmap({
   monthRef,
   currency = "INR",
   locale = "en-IN",
+  onDayClick,
 }: {
   data: { date: string; total: number; day: number }[];
   monthRef: Date;
   currency?: string;
   locale?: string;
+  /** Optional — when supplied, each day cell becomes a button. */
+  onDayClick?: (date: string) => void;
 }) {
   const max = Math.max(1, ...data.map((d) => d.total));
   const firstWeekday = new Date(monthRef.getFullYear(), monthRef.getMonth(), 1).getDay();
@@ -58,16 +61,31 @@ export function CalendarHeatmap({
         {data.map((d) => {
           const intensity = d.total / max;
           const { bg, text } = bucket(intensity);
+          const className = cn(
+            "aspect-square rounded-md grid place-items-center text-xs font-semibold tabular-nums transition-all",
+            bg,
+            text,
+            onDayClick && d.total > 0 && "cursor-pointer hover:scale-110 active:scale-95",
+            onDayClick && d.total === 0 && "cursor-default opacity-60"
+          );
+          const title = `${d.date}: ${formatCurrency(d.total, currency, locale)}`;
+          if (onDayClick) {
+            return (
+              <button
+                key={d.date}
+                type="button"
+                title={title}
+                disabled={d.total === 0}
+                onClick={() => onDayClick(d.date)}
+                className={className}
+                aria-label={title}
+              >
+                {d.day}
+              </button>
+            );
+          }
           return (
-            <div
-              key={d.date}
-              title={`${d.date}: ${formatCurrency(d.total, currency, locale)}`}
-              className={cn(
-                "aspect-square rounded-md grid place-items-center text-xs font-semibold tabular-nums transition-colors",
-                bg,
-                text
-              )}
-            >
+            <div key={d.date} title={title} className={className}>
               {d.day}
             </div>
           );
