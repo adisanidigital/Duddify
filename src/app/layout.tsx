@@ -48,33 +48,36 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script
           dangerouslySetInnerHTML={{
             __html: `
+              /*
+               * 2026-05-13 — Service Worker temporarily disabled while we
+               * recover from a caching outage. We still REGISTER /sw.js so
+               * existing PWAs pick up the killswitch SW (which unregisters
+               * itself + clears all caches), but we do not re-register any
+               * SW afterwards. Once we've verified the app is back up, this
+               * block will be reinstated with a safer SW design.
+               */
               (function () {
                 if (!('serviceWorker' in navigator)) return;
                 var refreshing = false;
-                // When a new SW takes control, reload once so the page gets
-                // the latest JS chunks. Without this, users on installed
-                // PWAs stay on the old build until they manually kill +
-                // reopen the app — the "stuck on grey grid" bug.
                 navigator.serviceWorker.addEventListener('controllerchange', function () {
                   if (refreshing) return;
                   refreshing = true;
                   window.location.reload();
                 });
+                // One-shot registration: triggers the killswitch SW for
+                // anyone who has the old one cached. After the killswitch
+                // unregisters, nothing else registers a SW — the page
+                // serves from the network on every load.
                 window.addEventListener('load', function () {
-                  navigator.serviceWorker.register('/sw.js').then(function (reg) {
-                    // Tell any waiting SW to take over immediately.
-                    if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-                    reg.addEventListener('updatefound', function () {
-                      var nw = reg.installing;
-                      if (!nw) return;
-                      nw.addEventListener('statechange', function () {
-                        if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-                          nw.postMessage({ type: 'SKIP_WAITING' });
-                        }
-                      });
-                    });
-                    // Periodically poll for updates while the tab is open.
-                    setInterval(function () { reg.update().catch(function(){}); }, 60000);
+                  navigator.serviceWorker.register('/sw.js').catch(function(){});
+                  // Also proactively unregister any leftover SWs that the
+                  // browser might still consider "controlling" — defence in
+                  // depth for browsers that don't honour the killswitch
+                  // self-unregister cleanly.
+                  navigator.serviceWorker.getRegistrations().then(function (regs) {
+                    setTimeout(function () {
+                      regs.forEach(function (r) { try { r.update(); } catch(e){} });
+                    }, 1500);
                   }).catch(function(){});
                 });
               })();
