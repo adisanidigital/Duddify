@@ -265,14 +265,25 @@ export default function OverviewPage() {
             <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground font-medium mb-0.5">
               Net saved this month
             </div>
-            <div
-              className={
-                "text-4xl md:text-6xl font-bold tabular-nums tracking-tight " +
-                (net >= 0 ? "gradient-text-primary" : "text-destructive")
-              }
-            >
+            <div className="text-4xl md:text-6xl font-bold tabular-nums tracking-tight">
+              {/* gradient-text-primary must be on the SAME element that
+                  directly contains the text — putting it on an outer
+                  wrapper means every child span inherits color:transparent
+                  and the number renders as invisible.  We push the gradient
+                  class INSIDE PrivateValue so the gradient span is the
+                  direct parent of the AnimatedCurrency text node. */}
               <PrivateValue mask="••••••••">
-                <AnimatedCurrency value={Math.max(0, net)} currency={currency} locale={locale} />
+                <span
+                  className={
+                    net >= 0 ? "gradient-text-primary" : "text-destructive"
+                  }
+                >
+                  <AnimatedCurrency
+                    value={Math.max(0, net)}
+                    currency={currency}
+                    locale={locale}
+                  />
+                </span>
               </PrivateValue>
             </div>
             <div className="text-xs text-muted-foreground mt-0.5">

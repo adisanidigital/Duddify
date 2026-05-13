@@ -108,13 +108,19 @@ export function StaggerItem({
 /**
  * Smooth count-up of a number, formatted as currency.
  *
- * Implementation: subscribe to the spring with useMotionValueEvent and push
- * the formatted string into React state on every animation frame. Older
- * versions of this component used `<motion.span>{motionValue}</motion.span>`
- * which relied on motion's MotionValue-as-text-child behaviour — that
- * broke silently in some motion versions and rendered as empty text,
- * producing the "Net saved this month value is blank" bug. Using React
- * state is slightly less efficient but always renders.
+ * Implementation: subscribe to the spring with .on("change", ...) and push
+ * the formatted string into React state on every animation frame.
+ *
+ * Renders the text via React.Fragment (no wrapper span) so the text node
+ * lands as a direct child of whatever parent the caller used. This matters
+ * because the hero "Net saved this month" container uses .gradient-text-
+ * primary, which sets `color: transparent` + `background-clip: text` — if
+ * we wrapped the text in our own span it would inherit `color: transparent`
+ * and become invisible (the "empty space where the number should be" bug).
+ *
+ * If a future caller needs an extra wrapping element with a className, they
+ * can wrap this component themselves; that's actually safer than us
+ * silently breaking gradient-text parents.
  */
 export function AnimatedCurrency({
   value,
@@ -125,6 +131,7 @@ export function AnimatedCurrency({
   value: number;
   currency?: string;
   locale?: string;
+  /** Optional — when set, the text is wrapped in a span with this className. */
   className?: string;
 }) {
   const reduceMotion = useReducedMotion();
@@ -136,20 +143,11 @@ export function AnimatedCurrency({
   );
 
   React.useEffect(() => {
-    // Honour prefers-reduced-motion by snapping straight to the value.
-    if (reduceMotion) {
-      mv.jump(value);
-    } else {
-      mv.set(value);
-    }
-    // Keep the displayed text in sync when currency/locale change too,
-    // independent of any spring activity.
+    if (reduceMotion) mv.jump(value);
+    else mv.set(value);
     setText(formatCurrency(Math.round(value), currency, locale));
   }, [value, currency, locale, reduceMotion, mv]);
 
-  // Subscribe to the spring's frame updates and write the formatted value
-  // into React state. This guarantees the text node actually renders even
-  // if motion changes how it handles MotionValue children in the future.
   React.useEffect(() => {
     const unsub = spring.on("change", (v) => {
       setText(formatCurrency(Math.round(v), currency, locale));
@@ -157,10 +155,12 @@ export function AnimatedCurrency({
     return () => unsub();
   }, [spring, currency, locale]);
 
-  return <span className={className}>{text}</span>;
+  if (className) return <span className={className}>{text}</span>;
+  return <>{text}</>;
 }
 
-/** Smooth count-up for a percent or plain integer. */
+/** Smooth count-up for a percent or plain integer. See AnimatedCurrency above
+ *  for the rationale behind Fragment-when-no-className rendering. */
 export function AnimatedNumber({
   value,
   suffix = "",
@@ -188,7 +188,8 @@ export function AnimatedNumber({
     return () => unsub();
   }, [spring, suffix]);
 
-  return <span className={className}>{text}</span>;
+  if (className) return <span className={className}>{text}</span>;
+  return <>{text}</>;
 }
 
 /** Card with hover-lift. */
