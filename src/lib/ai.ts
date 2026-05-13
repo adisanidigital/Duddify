@@ -76,6 +76,56 @@ export async function askAI(
 /*  Domain-specific prompts                                                   */
 /* ------------------------------------------------------------------------- */
 
+/**
+ * Streaming chat — Pollinations supports SSE-style streaming. We yield
+ * tokens via an async iterator so the UI can render them progressively.
+ * Falls back gracefully to a single response if streaming fails.
+ */
+export async function* streamAI(
+  messages: AIMessage[],
+  opts: { model?: string; signal?: AbortSignal } = {}
+): AsyncGenerator<string, void, unknown> {
+  const { model = "openai", signal } = opts;
+  const res = await fetch(ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature: 0.4,
+      max_tokens: 600,
+      stream: true,
+    }),
+    signal,
+  });
+  if (!res.ok || !res.body) {
+    throw new Error(`AI request failed (${res.status})`);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith("data:")) continue;
+      const payload = trimmed.slice(5).trim();
+      if (payload === "[DONE]") return;
+      try {
+        const j = JSON.parse(payload);
+        const delta = j?.choices?.[0]?.delta?.content;
+        if (typeof delta === "string" && delta.length > 0) yield delta;
+      } catch {
+        // Some Pollinations responses are not strict JSON; ignore parse errors.
+      }
+    }
+  }
+}
+
 export type GoalSummaryInput = {
   /** "Trip to Goa" — title only, no PII */
   title: string;

@@ -39,6 +39,7 @@ import { useHousehold, useProfile, useSession } from "@/lib/hooks/use-household"
 import { PrivacyToggle } from "@/components/private-value";
 import { BiometricGate } from "@/components/biometric-gate";
 import { CommandPalette } from "@/components/command-palette";
+import { ChatFab } from "@/components/chat-fab";
 import { useFeatureFlags } from "@/lib/feature-flags";
 import { toast } from "sonner";
 import { Target } from "lucide-react";
@@ -130,6 +131,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <BiometricGate>
     <CommandPalette />
+    <ChatFab />
     <div className="min-h-screen flex">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex md:w-64 lg:w-72 flex-col border-r glass">

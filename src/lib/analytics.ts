@@ -42,6 +42,105 @@ export function groupByDay(txs: Transaction[]) {
   return [...map.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, total]) => ({ date, total }));
 }
 
+/**
+ * Pivot transactions into a per-day-per-category table suitable for a
+ * stacked bar chart. Returns:
+ *   - rows: array of { date: "YYYY-MM-DD", [categoryId]: amount, ... }
+ *           one row per day in the input txs (only days with activity)
+ *   - series: { key: categoryId, name, color } sorted so the BIGGEST
+ *             contributors stack at the bottom (visually most stable),
+ *             everything else collapsed into an "Other" stack if it
+ *             gets too crowded (>maxSeries categories).
+ */
+export function groupByDayAndCategory(
+  txs: Transaction[],
+  categories: Category[],
+  opts: { maxSeries?: number } = {}
+) {
+  const { maxSeries = 8 } = opts;
+  const catById = new Map(categories.map((c) => [c.id, c] as const));
+
+  // First pass: total per category to pick the top N
+  const catTotals = new Map<string, number>();
+  for (const t of txs) {
+    if (!catById.has(t.category_id)) continue;
+    catTotals.set(t.category_id, (catTotals.get(t.category_id) ?? 0) + Number(t.amount));
+  }
+  const sorted = [...catTotals.entries()].sort((a, b) => b[1] - a[1]);
+  const top = new Set(sorted.slice(0, maxSeries).map(([id]) => id));
+  const hasOther = sorted.length > maxSeries;
+
+  // Second pass: pivot
+  const dayMap = new Map<string, Record<string, number | string>>();
+  for (const t of txs) {
+    const day = t.occurred_on;
+    const row = dayMap.get(day) ?? { date: day };
+    const key = top.has(t.category_id) ? t.category_id : "__other";
+    row[key] = (Number(row[key]) || 0) + Number(t.amount);
+    dayMap.set(day, row);
+  }
+  const rows = [...dayMap.values()].sort((a, b) =>
+    String(a.date).localeCompare(String(b.date))
+  );
+
+  // Build series in stacking order: biggest at the bottom looks best.
+  const series: { key: string; name: string; color: string }[] = [];
+  for (const [id] of sorted) {
+    if (!top.has(id)) continue;
+    const c = catById.get(id)!;
+    series.push({ key: id, name: c.name, color: c.color });
+  }
+  if (hasOther) {
+    series.push({ key: "__other", name: "Other", color: "hsl(var(--muted-foreground))" });
+  }
+  return { rows, series };
+}
+
+/**
+ * Pivot transactions into per-MONTH-per-category for a stacked monthly
+ * bar chart (used on the Income and Expense pages).
+ */
+export function groupByMonthAndCategory(
+  txs: Transaction[],
+  categories: Category[],
+  opts: { maxSeries?: number } = {}
+) {
+  const { maxSeries = 8 } = opts;
+  const catById = new Map(categories.map((c) => [c.id, c] as const));
+
+  const catTotals = new Map<string, number>();
+  for (const t of txs) {
+    if (!catById.has(t.category_id)) continue;
+    catTotals.set(t.category_id, (catTotals.get(t.category_id) ?? 0) + Number(t.amount));
+  }
+  const sorted = [...catTotals.entries()].sort((a, b) => b[1] - a[1]);
+  const top = new Set(sorted.slice(0, maxSeries).map(([id]) => id));
+  const hasOther = sorted.length > maxSeries;
+
+  const monthMap = new Map<string, Record<string, number | string>>();
+  for (const t of txs) {
+    const key = monthKey(new Date(t.occurred_on));
+    const row = monthMap.get(key) ?? { month: key };
+    const k = top.has(t.category_id) ? t.category_id : "__other";
+    row[k] = (Number(row[k]) || 0) + Number(t.amount);
+    monthMap.set(key, row);
+  }
+  const rows = [...monthMap.values()].sort((a, b) =>
+    String(a.month).localeCompare(String(b.month))
+  );
+
+  const series: { key: string; name: string; color: string }[] = [];
+  for (const [id] of sorted) {
+    if (!top.has(id)) continue;
+    const c = catById.get(id)!;
+    series.push({ key: id, name: c.name, color: c.color });
+  }
+  if (hasOther) {
+    series.push({ key: "__other", name: "Other", color: "hsl(var(--muted-foreground))" });
+  }
+  return { rows, series };
+}
+
 export function groupByMonth(txs: Transaction[]) {
   const map = new Map<string, Record<TxType, number>>();
   for (const t of txs) {

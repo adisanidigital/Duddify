@@ -29,6 +29,7 @@ import {
   EyeOff,
   Search,
   Target,
+  MessageCircle,
 } from "lucide-react";
 import { useFeatureFlags } from "@/lib/feature-flags";
 
@@ -58,6 +59,13 @@ const NAV: NavEntry[] = [
     keywords: ["save", "savings", "target", "plan"],
     icon: Target,
     requiresFlag: "goals",
+  },
+  {
+    href: "/chat",
+    label: "AI chat",
+    keywords: ["ask", "ai", "assistant", "help", "advisor"],
+    icon: MessageCircle,
+    requiresFlag: "ai",
   },
   { href: "/yearly", label: "Yearly", keywords: ["year"], icon: CalendarDays },
   { href: "/reports", label: "Reports", keywords: ["report", "analytics"], icon: FileBarChart },

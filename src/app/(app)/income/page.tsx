@@ -3,11 +3,15 @@
 import * as React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
-import { CategoryPie, TrendArea } from "@/components/charts";
+import { CategoryPie, TrendArea, MonthBars } from "@/components/charts";
 import { useCategories, useTransactions } from "@/lib/hooks/use-data";
 import { useHousehold } from "@/lib/hooks/use-household";
-import { groupByCategory, groupByMonth } from "@/lib/analytics";
-import { formatCurrency, isoDate, pct } from "@/lib/utils";
+import {
+  groupByCategory,
+  groupByMonth,
+  groupByMonthAndCategory,
+} from "@/lib/analytics";
+import { formatCurrency, isoDate, pct, cn } from "@/lib/utils";
 import { PageMotion } from "@/components/motion";
 
 export default function IncomePage() {
@@ -23,6 +27,11 @@ export default function IncomePage() {
   const monthly = groupByMonth(income);
   const byCat = groupByCategory(income, categories);
   const total = income.reduce((s, t) => s + Number(t.amount), 0);
+  const monthStack = React.useMemo(
+    () => groupByMonthAndCategory(income, categories),
+    [income, categories]
+  );
+  const [trendView, setTrendView] = React.useState<"total" | "split">("split");
 
   const ytd = income
     .filter((t) => t.occurred_on >= isoDate(new Date(new Date().getFullYear(), 0, 1)))
@@ -58,19 +67,76 @@ export default function IncomePage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Income trend</CardTitle>
-            <CardDescription>Last 12 months</CardDescription>
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <CardTitle>Income trend</CardTitle>
+                <CardDescription>Last 12 months</CardDescription>
+              </div>
+              <div className="inline-flex rounded-lg border bg-card p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setTrendView("split")}
+                  className={cn(
+                    "px-2.5 py-1 text-xs rounded-md transition-all",
+                    trendView === "split"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                  aria-pressed={trendView === "split"}
+                >
+                  By source
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTrendView("total")}
+                  className={cn(
+                    "px-2.5 py-1 text-xs rounded-md transition-all",
+                    trendView === "total"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                  aria-pressed={trendView === "total"}
+                >
+                  Total
+                </button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <TrendArea
-              data={monthly}
-              dataKey="income"
-              name="Income"
-              color="hsl(var(--success))"
-              currency={currency}
-              locale={locale}
-              height={240}
-            />
+            {trendView === "split" && monthStack.series.length > 0 ? (
+              <>
+                <MonthBars
+                  data={monthStack.rows}
+                  series={monthStack.series}
+                  currency={currency}
+                  locale={locale}
+                  height={240}
+                  stacked
+                  showLegend={false}
+                />
+                <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5 text-[11px] text-muted-foreground">
+                  {monthStack.series.map((s) => (
+                    <span key={s.key} className="inline-flex items-center gap-1.5">
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ background: s.color }}
+                      />
+                      <span className="truncate max-w-[120px]">{s.name}</span>
+                    </span>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <TrendArea
+                data={monthly}
+                dataKey="income"
+                name="Income"
+                color="hsl(var(--success))"
+                currency={currency}
+                locale={locale}
+                height={240}
+              />
+            )}
           </CardContent>
         </Card>
 

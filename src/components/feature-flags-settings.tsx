@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { motion } from "motion/react";
 import {
   Card,
@@ -9,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useFeatureFlags, type FeatureFlags } from "@/lib/feature-flags";
 import {
@@ -17,6 +19,7 @@ import {
   TrendingUp,
   Sliders,
   ShieldCheck,
+  MessageCircle,
 } from "lucide-react";
 
 const ITEMS: {
@@ -96,14 +99,33 @@ export function FeatureFlagsSettings() {
           );
         })}
         {flags.ai && (
-          <div className="text-[11px] text-muted-foreground mt-1 leading-relaxed flex items-start gap-1.5">
-            <ShieldCheck className="h-3 w-3 mt-0.5 text-success shrink-0" />
-            <span>
-              AI uses Pollinations.ai (free, no account). We send only
-              aggregated numbers — never raw transactions, names, or notes.
-              You can turn it off anytime.
-            </span>
-          </div>
+          <>
+            <div className="text-[11px] text-muted-foreground mt-1 leading-relaxed flex items-start gap-1.5">
+              <ShieldCheck className="h-3 w-3 mt-0.5 text-success shrink-0" />
+              <span>
+                AI uses Pollinations.ai (free, no account). We send only
+                aggregated numbers — never raw transactions, names, or notes.
+                You can turn it off anytime.
+              </span>
+            </div>
+            <Link
+              href="/chat"
+              className="mt-2 flex items-center gap-3 p-3 rounded-lg border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors group"
+            >
+              <div className="h-9 w-9 rounded-lg gradient-primary text-primary-foreground grid place-items-center shrink-0 shadow-md shadow-primary/30">
+                <MessageCircle className="h-4 w-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium">Open AI chat</div>
+                <div className="text-xs text-muted-foreground">
+                  Ask anything about your spend, income, goals, or trends.
+                </div>
+              </div>
+              <Button size="sm" variant="ghost" className="shrink-0">
+                Open →
+              </Button>
+            </Link>
+          </>
         )}
       </CardContent>
     </Card>

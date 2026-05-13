@@ -347,18 +347,128 @@ export function DailyBar({
   );
 }
 
-export function MonthBars({
+/**
+ * Stacked daily bar chart — one bar per day, sub-stacked by category.
+ *
+ * `data` should be a row per day: { date: "YYYY-MM-DD", [categoryId]: amount, ... }
+ * `series` describes each stack: { key: categoryId, name: categoryName, color }
+ * The top stack gets rounded corners. Tooltip lists every stack.
+ */
+export function StackedDailyBar({
   data,
   series,
   currency = "INR",
   locale = "en-IN",
   height = 240,
+  onBarClick,
 }: {
   data: any[];
   series: { key: string; name: string; color: string }[];
   currency?: string;
   locale?: string;
   height?: number;
+  onBarClick?: (date: string) => void;
+}) {
+  if (!data.length || !series.length) return <Empty height={height} />;
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <BarChart
+        data={data}
+        margin={{ top: 6, right: 8, left: 0, bottom: 0 }}
+        onClick={(e: any) => {
+          if (!onBarClick) return;
+          const date = e?.activePayload?.[0]?.payload?.date;
+          if (date) onBarClick(date);
+        }}
+      >
+        <CartesianGrid stroke={GRID} strokeDasharray="3 3" vertical={false} />
+        <XAxis
+          dataKey="date"
+          tick={{ fill: AXIS, fontSize: 11 }}
+          tickFormatter={(s) => s.slice(8, 10)}
+          axisLine={false}
+          tickLine={false}
+        />
+        <YAxis
+          tick={{ fill: AXIS, fontSize: 11 }}
+          tickFormatter={(v) => formatCompact(v, currency, locale)}
+          axisLine={false}
+          tickLine={false}
+          width={60}
+        />
+        <Tooltip
+          content={<StackTooltip currency={currency} locale={locale} />}
+          cursor={{ fill: "hsl(var(--accent))" }}
+        />
+        {series.map((s, i) => (
+          <Bar
+            key={s.key}
+            dataKey={s.key}
+            name={s.name}
+            stackId="day"
+            fill={s.color}
+            // Round only the very top of the stack so the visual is clean.
+            radius={i === series.length - 1 ? [6, 6, 0, 0] : 0}
+            style={onBarClick ? { cursor: "pointer" } : undefined}
+          />
+        ))}
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+/** Tooltip for stacked charts — shows every non-zero stack, plus the total. */
+function StackTooltip({ active, payload, label, currency, locale }: any) {
+  if (!active || !payload?.length) return null;
+  const total = payload.reduce((s: number, p: any) => s + Number(p.value || 0), 0);
+  const filled = payload.filter((p: any) => Number(p.value) > 0);
+  return (
+    <div className="rounded-lg border bg-popover/95 backdrop-blur px-3 py-2 text-xs shadow-lg animate-in fade-in-0 zoom-in-95 duration-150 max-w-[240px]">
+      {label && <div className="font-medium mb-1.5">{label}</div>}
+      <div className="space-y-1">
+        {filled.map((p: any, i: number) => (
+          <div key={i} className="flex items-center gap-2">
+            <span
+              className="h-2 w-2 rounded-full shrink-0"
+              style={{ background: p.color || p.fill }}
+            />
+            <span className="text-muted-foreground truncate flex-1">{p.name}</span>
+            <span className="font-medium tabular-nums">
+              {formatCurrency(Number(p.value), currency, locale)}
+            </span>
+          </div>
+        ))}
+        {filled.length > 1 && (
+          <div className="flex items-center gap-2 mt-1.5 pt-1.5 border-t font-medium">
+            <span className="h-2 w-2 shrink-0" />
+            <span className="text-foreground flex-1">Total</span>
+            <span className="tabular-nums">
+              {formatCurrency(total, currency, locale)}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function MonthBars({
+  data,
+  series,
+  currency = "INR",
+  locale = "en-IN",
+  height = 240,
+  stacked = false,
+  showLegend = true,
+}: {
+  data: any[];
+  series: { key: string; name: string; color: string }[];
+  currency?: string;
+  locale?: string;
+  height?: number;
+  /** When true, render the bars as a single stacked column per month. */
+  stacked?: boolean;
+  showLegend?: boolean;
 }) {
   if (!data.length) return <Empty height={height} />;
   return (
@@ -373,10 +483,26 @@ export function MonthBars({
           tickLine={false}
           width={60}
         />
-        <Tooltip content={<ChartTooltip currency={currency} locale={locale} />} cursor={{ fill: "hsl(var(--accent))" }} />
-        <Legend wrapperStyle={{ fontSize: 12 }} />
-        {series.map((s) => (
-          <Bar key={s.key} dataKey={s.key} name={s.name} fill={s.color} radius={[4, 4, 0, 0]} />
+        <Tooltip
+          content={
+            stacked
+              ? <StackTooltip currency={currency} locale={locale} />
+              : <ChartTooltip currency={currency} locale={locale} />
+          }
+          cursor={{ fill: "hsl(var(--accent))" }}
+        />
+        {showLegend && !stacked && <Legend wrapperStyle={{ fontSize: 12 }} />}
+        {series.map((s, i) => (
+          <Bar
+            key={s.key}
+            dataKey={s.key}
+            name={s.name}
+            fill={s.color}
+            stackId={stacked ? "month" : undefined}
+            radius={
+              stacked ? (i === series.length - 1 ? [6, 6, 0, 0] : 0) : [4, 4, 0, 0]
+            }
+          />
         ))}
       </BarChart>
     </ResponsiveContainer>

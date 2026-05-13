@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
-import { CategoryPie, DailyBar } from "@/components/charts";
+import { CategoryPie, DailyBar, StackedDailyBar } from "@/components/charts";
 import { CalendarHeatmap } from "@/components/calendar-heatmap";
 import { MonthPicker } from "@/components/month-picker";
 import { TransactionRow } from "@/components/transaction-row";
@@ -24,9 +25,10 @@ import {
   dailyHeatmap,
   groupByCategory,
   groupByDay,
+  groupByDayAndCategory,
   inRange,
 } from "@/lib/analytics";
-import { formatCurrency, isoDate, pct, startOfMonth, endOfMonth } from "@/lib/utils";
+import { formatCurrency, isoDate, pct, startOfMonth, endOfMonth, cn } from "@/lib/utils";
 
 export default function ExpensesPage() {
   const [ref, setRef] = React.useState(() => startOfMonth(new Date()));
@@ -108,10 +110,15 @@ export default function ExpensesPage() {
 
   const byCat = groupByCategory(expenses, categories);
   const byDay = groupByDay(expenses);
+  const stack = React.useMemo(
+    () => groupByDayAndCategory(expenses, categories),
+    [expenses, categories]
+  );
   const total = expenses.reduce((s, t) => s + Number(t.amount), 0);
   const heat = dailyHeatmap(expenses, ref);
   const biggest = biggestTransactions(expenses, 6);
   const avgPerDay = total / Math.max(1, new Date().getDate());
+  const [dailyView, setDailyView] = React.useState<"total" | "split">("split");
 
   return (
     <PageMotion className="container max-w-6xl py-4 md:py-8 space-y-5">
@@ -157,19 +164,76 @@ export default function ExpensesPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Daily spend</CardTitle>
-            <CardDescription>
-              Each bar is one day this month · tap a bar to see the details
-            </CardDescription>
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <CardTitle>Daily spend</CardTitle>
+                <CardDescription>
+                  Tap a bar to see the details for that day
+                </CardDescription>
+              </div>
+              <div className="inline-flex rounded-lg border bg-card p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setDailyView("split")}
+                  className={cn(
+                    "px-2.5 py-1 text-xs rounded-md transition-all",
+                    dailyView === "split"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                  aria-pressed={dailyView === "split"}
+                >
+                  By category
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDailyView("total")}
+                  className={cn(
+                    "px-2.5 py-1 text-xs rounded-md transition-all",
+                    dailyView === "total"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                  aria-pressed={dailyView === "total"}
+                >
+                  Total
+                </button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <DailyBar
-              data={byDay}
-              currency={currency}
-              locale={locale}
-              height={240}
-              onBarClick={setDrillDay}
-            />
+            {dailyView === "split" && stack.series.length > 0 ? (
+              <>
+                <StackedDailyBar
+                  data={stack.rows}
+                  series={stack.series}
+                  currency={currency}
+                  locale={locale}
+                  height={240}
+                  onBarClick={setDrillDay}
+                />
+                {/* Compact legend below the chart */}
+                <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5 text-[11px] text-muted-foreground">
+                  {[...stack.series].reverse().map((s) => (
+                    <span key={s.key} className="inline-flex items-center gap-1.5">
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ background: s.color }}
+                      />
+                      <span className="truncate max-w-[120px]">{s.name}</span>
+                    </span>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <DailyBar
+                data={byDay}
+                currency={currency}
+                locale={locale}
+                height={240}
+                onBarClick={setDrillDay}
+              />
+            )}
           </CardContent>
         </Card>
 
