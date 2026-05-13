@@ -47,7 +47,38 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>{children}</Providers>
         <script
           dangerouslySetInnerHTML={{
-            __html: `if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => {}); }); }`,
+            __html: `
+              (function () {
+                if (!('serviceWorker' in navigator)) return;
+                var refreshing = false;
+                // When a new SW takes control, reload once so the page gets
+                // the latest JS chunks. Without this, users on installed
+                // PWAs stay on the old build until they manually kill +
+                // reopen the app — the "stuck on grey grid" bug.
+                navigator.serviceWorker.addEventListener('controllerchange', function () {
+                  if (refreshing) return;
+                  refreshing = true;
+                  window.location.reload();
+                });
+                window.addEventListener('load', function () {
+                  navigator.serviceWorker.register('/sw.js').then(function (reg) {
+                    // Tell any waiting SW to take over immediately.
+                    if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                    reg.addEventListener('updatefound', function () {
+                      var nw = reg.installing;
+                      if (!nw) return;
+                      nw.addEventListener('statechange', function () {
+                        if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                          nw.postMessage({ type: 'SKIP_WAITING' });
+                        }
+                      });
+                    });
+                    // Periodically poll for updates while the tab is open.
+                    setInterval(function () { reg.update().catch(function(){}); }, 60000);
+                  }).catch(function(){});
+                });
+              })();
+            `,
           }}
         />
       </body>
