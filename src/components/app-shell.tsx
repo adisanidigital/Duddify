@@ -4,7 +4,6 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { SplashScreen } from "@/components/splash-screen";
 import {
   LayoutDashboard,
   Receipt,
@@ -97,59 +96,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     [flags]
   );
 
+  // Note: the boot splash has been removed entirely. It was causing the
+  // "grey grid screen reappears every now and then" UX where one user
+  // saw it every login. The app shell now renders immediately on every
+  // page load; individual pages handle their own loading states via
+  // skeletons / empty states, which is far less jarring than a blocking
+  // full-screen splash that might or might not auto-dismiss in time.
   const ready = !sLoading && !pLoading && !hLoading;
-
-  // Splash visibility — see SplashScreen for the actual UI escape hatches.
-  // Notes on the design:
-  //  - We persist "splash seen" to BOTH sessionStorage and localStorage.
-  //    Older approach was sessionStorage-only, but iOS Safari can drop
-  //    sessionStorage when a PWA is suspended in the background, which
-  //    re-triggers the splash on every wake — exactly the "grid screen
-  //    reappears at random" bug users have hit.
-  //  - localStorage flag is per-day, so a user who reopens the app the
-  //    next day still gets the splash exactly once.
-  //  - A hard 6-second escape hatch unconditionally dismisses the splash
-  //    even if the auth/profile/household queries are still loading. The
-  //    queries themselves now have per-call timeouts (see use-household.ts),
-  //    but defence-in-depth: a frozen splash is the worst possible UX.
-  const SPLASH_KEY = "duddify.splash-seen";
-  const today = new Date().toISOString().slice(0, 10);
-
-  const [splashSeen, setSplashSeen] = React.useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      if (sessionStorage.getItem(SPLASH_KEY) === "true") return true;
-      const seenDay = localStorage.getItem(SPLASH_KEY);
-      if (seenDay && seenDay === today) return true;
-    } catch {}
-    return false;
-  });
-
-  const markSplashSeen = React.useCallback(() => {
-    setSplashSeen(true);
-    try {
-      sessionStorage.setItem(SPLASH_KEY, "true");
-      localStorage.setItem(SPLASH_KEY, today);
-    } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [today]);
-
-  React.useEffect(() => {
-    if (splashSeen) return;
-    // Whenever we become "ready", hold for a brief moment so the entrance
-    // animation lands, then dismiss permanently for this session/day.
-    if (ready) {
-      const t = setTimeout(markSplashSeen, 600);
-      return () => clearTimeout(t);
-    }
-    // Hard escape: regardless of `ready`, force-dismiss after 6s. Queries
-    // have their own 4–8s timeouts, but if anything goes wrong upstream
-    // (network, SW, etc.) the user must never be stuck.
-    const escape = setTimeout(markSplashSeen, 6000);
-    return () => clearTimeout(escape);
-  }, [ready, splashSeen, markSplashSeen]);
-
-  const showSplash = !splashSeen;
 
   React.useEffect(() => {
     if (!ready) return;
@@ -163,8 +116,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setDrawerOpen(false);
   }, [pathname]);
 
-  if (showSplash) {
-    return <SplashScreen show onContinue={markSplashSeen} />;
+  // While auth/profile is still settling on a cold load, render a minimal
+  // wrapper so users see *something* immediately. Once profile + household
+  // resolve, the full nav shell snaps in. This avoids any blocking screen.
+  if (!ready) {
+    return <BootShell>{children}</BootShell>;
   }
 
   if (!profile?.household_id) {
@@ -520,6 +476,33 @@ function UserBlock() {
           <LogOut className="h-4 w-4" />
         </Button>
       </form>
+    </div>
+  );
+}
+
+/**
+ * Minimal non-blocking wrapper rendered while auth / profile / household
+ * queries are still resolving on a cold load. No full-screen takeover, no
+ * grids, no fancy logo — just a thin top bar with a subtle progress shimmer
+ * so the page feels alive. The page's own children render below with their
+ * own loading skeletons. The moment `ready` flips true, AppShell snaps to
+ * the full nav layout.
+ */
+function BootShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen flex flex-col">
+      <div
+        className="h-1 w-full overflow-hidden bg-transparent"
+        aria-hidden="true"
+      >
+        <motion.div
+          initial={{ x: "-100%" }}
+          animate={{ x: "100%" }}
+          transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+          className="h-full w-1/3 rounded-full bg-gradient-to-r from-transparent via-primary to-transparent"
+        />
+      </div>
+      <main className="flex-1 pb-28 md:pb-6">{children}</main>
     </div>
   );
 }
