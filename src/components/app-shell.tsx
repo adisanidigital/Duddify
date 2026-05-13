@@ -99,32 +99,57 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const ready = !sLoading && !pLoading && !hLoading;
 
-  // Show the splash on the very first cold start of this tab/session, then
-  // never again — even if a query briefly refetches on tab focus or the
-  // shell remounts on a layout transition. Otherwise users see a misleading
-  // "loading the app from scratch" screen when navigating between dashboards.
+  // Splash visibility — see SplashScreen for the actual UI escape hatches.
+  // Notes on the design:
+  //  - We persist "splash seen" to BOTH sessionStorage and localStorage.
+  //    Older approach was sessionStorage-only, but iOS Safari can drop
+  //    sessionStorage when a PWA is suspended in the background, which
+  //    re-triggers the splash on every wake — exactly the "grid screen
+  //    reappears at random" bug users have hit.
+  //  - localStorage flag is per-day, so a user who reopens the app the
+  //    next day still gets the splash exactly once.
+  //  - A hard 6-second escape hatch unconditionally dismisses the splash
+  //    even if the auth/profile/household queries are still loading. The
+  //    queries themselves now have per-call timeouts (see use-household.ts),
+  //    but defence-in-depth: a frozen splash is the worst possible UX.
+  const SPLASH_KEY = "duddify.splash-seen";
+  const today = new Date().toISOString().slice(0, 10);
+
   const [splashSeen, setSplashSeen] = React.useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     try {
-      return sessionStorage.getItem("duddify.splash-seen") === "true";
-    } catch {
-      return false;
-    }
+      if (sessionStorage.getItem(SPLASH_KEY) === "true") return true;
+      const seenDay = localStorage.getItem(SPLASH_KEY);
+      if (seenDay && seenDay === today) return true;
+    } catch {}
+    return false;
   });
-  React.useEffect(() => {
-    if (!ready || splashSeen) return;
-    // Hold the splash for a brief minimum so the entrance animation lands,
-    // then mark it seen for the rest of this tab's lifetime.
-    const t = setTimeout(() => {
-      setSplashSeen(true);
-      try {
-        sessionStorage.setItem("duddify.splash-seen", "true");
-      } catch {}
-    }, 700);
-    return () => clearTimeout(t);
-  }, [ready, splashSeen]);
 
-  const showSplash = !splashSeen && !ready;
+  const markSplashSeen = React.useCallback(() => {
+    setSplashSeen(true);
+    try {
+      sessionStorage.setItem(SPLASH_KEY, "true");
+      localStorage.setItem(SPLASH_KEY, today);
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [today]);
+
+  React.useEffect(() => {
+    if (splashSeen) return;
+    // Whenever we become "ready", hold for a brief moment so the entrance
+    // animation lands, then dismiss permanently for this session/day.
+    if (ready) {
+      const t = setTimeout(markSplashSeen, 600);
+      return () => clearTimeout(t);
+    }
+    // Hard escape: regardless of `ready`, force-dismiss after 6s. Queries
+    // have their own 4–8s timeouts, but if anything goes wrong upstream
+    // (network, SW, etc.) the user must never be stuck.
+    const escape = setTimeout(markSplashSeen, 6000);
+    return () => clearTimeout(escape);
+  }, [ready, splashSeen, markSplashSeen]);
+
+  const showSplash = !splashSeen;
 
   React.useEffect(() => {
     if (!ready) return;
@@ -139,7 +164,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   if (showSplash) {
-    return <SplashScreen show />;
+    return <SplashScreen show onContinue={markSplashSeen} />;
   }
 
   if (!profile?.household_id) {

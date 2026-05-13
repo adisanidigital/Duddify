@@ -2,9 +2,53 @@
 
 import * as React from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Wallet } from "lucide-react";
+import { Wallet, RotateCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-export function SplashScreen({ show }: { show: boolean }) {
+/**
+ * App boot splash. Always animates a fresh entrance, but exposes an escape
+ * hatch if anything upstream is slow:
+ *  - After 4s a "Tap to continue" button fades in (calls onContinue).
+ *  - After 8s a "Reload app" button appears for the truly stuck cases.
+ *
+ * The parent (AppShell) also has a 6s hard auto-dismiss, so users are never
+ * truly trapped — but the manual buttons let them act sooner if they notice
+ * the app is hanging.
+ */
+export function SplashScreen({
+  show,
+  onContinue,
+}: {
+  show: boolean;
+  onContinue?: () => void;
+}) {
+  const [showEscape, setShowEscape] = React.useState(false);
+  const [showReload, setShowReload] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!show) return;
+    const t1 = setTimeout(() => setShowEscape(true), 4000);
+    const t2 = setTimeout(() => setShowReload(true), 8000);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [show]);
+
+  const reload = () => {
+    if (typeof window === "undefined") return;
+    // Try to clear the SW + caches before reloading so users stuck on a
+    // bad cached chunk get a clean slate.
+    Promise.allSettled([
+      navigator.serviceWorker?.getRegistrations().then((rs) =>
+        Promise.all(rs.map((r) => r.unregister()))
+      ),
+      "caches" in window
+        ? caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+        : Promise.resolve(),
+    ]).finally(() => window.location.reload());
+  };
+
   return (
     <AnimatePresence>
       {show && (
@@ -114,6 +158,34 @@ export function SplashScreen({ show }: { show: boolean }) {
                 />
               ))}
             </motion.div>
+
+            {/* Escape hatches — appear after a few seconds if the app is slow */}
+            <AnimatePresence>
+              {showEscape && (
+                <motion.div
+                  key="escape"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.4 }}
+                  className="mt-6 flex flex-col items-center gap-2"
+                >
+                  <p className="text-xs text-muted-foreground text-center max-w-[260px] leading-relaxed">
+                    Taking longer than usual. Network might be slow.
+                  </p>
+                  {onContinue && (
+                    <Button size="sm" variant="outline" onClick={onContinue}>
+                      Continue anyway
+                    </Button>
+                  )}
+                  {showReload && (
+                    <Button size="sm" variant="ghost" onClick={reload}>
+                      <RotateCw className="h-3.5 w-3.5" /> Reload app
+                    </Button>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </motion.div>
       )}
