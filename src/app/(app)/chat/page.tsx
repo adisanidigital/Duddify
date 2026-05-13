@@ -105,6 +105,7 @@ export default function ChatPage() {
       members,
       currency,
       householdName: hh?.name,
+      includeNotes: flags.aiIncludeNotes,
     });
     // Send the system prompt + recent turns. Cap history at 12 turns so
     // long conversations don't blow the context window.
@@ -259,10 +260,28 @@ export default function ChatPage() {
         )}
       </div>
 
-      <div className="text-[10px] text-muted-foreground inline-flex items-center justify-center gap-1.5 flex-wrap">
-        <ShieldCheck className="h-3 w-3 text-success" />
-        Only aggregated numbers + category names are sent — never raw
-        transactions, notes, or names beyond your household members.
+      <div className="text-[10px] text-muted-foreground inline-flex items-center justify-center gap-1.5 flex-wrap text-center px-2">
+        <ShieldCheck className="h-3 w-3 text-success shrink-0" />
+        Sends the last 90 days of transactions (date, amount, category) +
+        aggregated totals.{" "}
+        {flags.aiIncludeNotes ? (
+          <>
+            Notes <strong className="text-foreground">are</strong> being sent
+            too —{" "}
+            <Link href="/settings" className="underline">
+              change
+            </Link>
+            .
+          </>
+        ) : (
+          <>
+            Notes are NOT sent — enable in{" "}
+            <Link href="/settings" className="underline">
+              Settings
+            </Link>{" "}
+            for richer answers.
+          </>
+        )}
       </div>
     </PageMotion>
   );

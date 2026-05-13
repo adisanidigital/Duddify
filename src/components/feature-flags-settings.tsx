@@ -20,6 +20,7 @@ import {
   Sliders,
   ShieldCheck,
   MessageCircle,
+  NotebookPen,
 } from "lucide-react";
 
 const ITEMS: {
@@ -100,12 +101,38 @@ export function FeatureFlagsSettings() {
         })}
         {flags.ai && (
           <>
+            {/* AI sub-option: include transaction notes verbatim */}
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-accent/40 ml-12">
+              <div className="h-9 w-9 rounded-lg bg-background grid place-items-center shrink-0">
+                <NotebookPen className="h-4 w-4 text-primary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium">
+                  Send transaction notes to AI
+                </div>
+                <div className="text-xs text-muted-foreground leading-relaxed mt-0.5">
+                  Lets the AI quote your notes back — e.g. &ldquo;you spent
+                  ₹450 on 9 May for &lsquo;lunch with Asha&rsquo;&rdquo;.
+                  Off by default because notes can contain names. Recommended
+                  ON for personal use, OFF if you share devices.
+                </div>
+              </div>
+              <Toggle
+                checked={flags.aiIncludeNotes}
+                disabled={!ready}
+                onChange={(v) => setFlag("aiIncludeNotes", v)}
+                aria-label="Send transaction notes to AI"
+              />
+            </div>
+
             <div className="text-[11px] text-muted-foreground mt-1 leading-relaxed flex items-start gap-1.5">
               <ShieldCheck className="h-3 w-3 mt-0.5 text-success shrink-0" />
               <span>
-                AI uses Pollinations.ai (free, no account). We send only
-                aggregated numbers — never raw transactions, names, or notes.
-                You can turn it off anytime.
+                AI uses Pollinations.ai (free, no account). The chat sends
+                aggregated totals plus the last 90 days of transactions
+                (date, amount, category){" "}
+                {flags.aiIncludeNotes ? "WITH notes." : "WITHOUT notes."}{" "}
+                Turn AI off any time to send nothing.
               </span>
             </div>
             <Link

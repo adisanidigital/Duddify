@@ -6,6 +6,10 @@ import * as React from "react";
 export type FeatureFlags = {
   /** Enables AI-powered insights & goal advisor (uses Pollinations.ai, free). */
   ai: boolean;
+  /** When true, send transaction notes (verbatim) to the AI for richer
+   *  answers like "you spent ₹500 on 9th May for 'lunch with Asha'".
+   *  Off by default because notes may contain names or personal context. */
+  aiIncludeNotes: boolean;
   /** Show the Goals tab in nav. */
   goals: boolean;
   /** Show the Investments tab + holdings table. */
@@ -14,6 +18,7 @@ export type FeatureFlags = {
 
 const DEFAULTS: FeatureFlags = {
   ai: true,
+  aiIncludeNotes: false,
   goals: true,
   investments: true,
 };

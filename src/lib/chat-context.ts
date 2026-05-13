@@ -1,28 +1,33 @@
 "use client";
 
 /**
- * Privacy-safe financial context summariser for the AI chat.
+ * Financial context summariser for the AI chat.
  *
  * The chat sends a single SYSTEM message with this summary on every turn,
- * so the LLM has enough information to answer "how much did I spend on
- * groceries last month?" etc. without us ever leaking raw transactions,
- * member names, notes, or any free-form user-entered strings.
+ * so the LLM has enough information to answer detailed questions about
+ * the user's spending. We balance usefulness against privacy by tiering:
  *
- * What we DO send:
+ * Always sent:
  *   - currency code (e.g. INR)
  *   - aggregated totals per month (income / expense / investment)
  *   - this month / last month / YTD totals
  *   - category names + rolled-up amounts (last 6 months)
- *   - the names of household members (so the AI knows "I" vs. "we")
+ *   - household member display names (so the AI knows "I" vs. "we")
  *   - the user's logging streak + savings rate
+ *   - DETAIL: per-transaction (amount, date, category, type) for the
+ *     last 90 days, capped at ~250 most recent transactions. This is
+ *     what powers "tell me about my Cabs spending this month" type
+ *     questions.
  *
- * What we DO NOT send:
- *   - any transaction note
- *   - any per-transaction amount or date
- *   - paid-by / who-logged data
- *   - receipt URLs
- *   - Supabase IDs
- *   - email addresses
+ * Sent only when `includeNotes` is true:
+ *   - the user-entered note for each transaction in the 90-day window.
+ *     Off by default because notes commonly contain names of people /
+ *     places that the user may not want sent to a third-party AI.
+ *
+ * Never sent:
+ *   - Supabase IDs / receipt URLs / email addresses
+ *   - paid-by / who-logged identifiers (only display names are passed
+ *     via the household members list)
  */
 
 import type { Category, Profile, Transaction } from "@/lib/types";
@@ -34,10 +39,14 @@ import {
   thisMonth,
 } from "@/lib/analytics";
 import { loggingStreak } from "@/lib/insights";
+import { isoDate } from "@/lib/utils";
 
 export type ChatContext = {
   currency: string;
   text: string;
+  /** True if individual notes were included in `text`. The UI uses this to
+   *  surface the right privacy disclosure to the user. */
+  notesIncluded: boolean;
 };
 
 export function buildChatContext({
@@ -46,13 +55,17 @@ export function buildChatContext({
   members,
   currency,
   householdName,
+  includeNotes = false,
 }: {
   txs: Transaction[];
   categories: Category[];
   members: Profile[];
   currency: string;
   householdName?: string | null;
+  /** If true, also send transaction notes verbatim. Default false. */
+  includeNotes?: boolean;
 }): ChatContext {
+  const catById = new Map(categories.map((c) => [c.id, c] as const));
   const cur = thisMonth(txs);
   const prev = lastMonth(txs);
   const curSum = sumByType(cur);
@@ -141,21 +154,65 @@ export function buildChatContext({
     }
   }
 
-  return { currency, text: lines.join("\n") };
+  // ---- DETAILED transaction list (last 90 days, capped) -------------------
+  // This is what lets the AI answer questions like "how much did I spend on
+  // Cabs and when?". We send: date, amount, type, category name, member,
+  // and optionally the note (only when includeNotes is true).
+  const ninetyDaysAgo = new Date();
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+  const detailFromKey = isoDate(ninetyDaysAgo);
+  const memberById = new Map(members.map((m) => [m.id, m] as const));
+  const detail = txs
+    .filter((t) => t.occurred_on >= detailFromKey)
+    .sort((a, b) => b.occurred_on.localeCompare(a.occurred_on))
+    .slice(0, 250);
+  if (detail.length > 0) {
+    lines.push("");
+    lines.push(`--- TRANSACTIONS (last 90 days, newest first, ${detail.length} shown) ---`);
+    lines.push("Format: DATE | TYPE | AMOUNT | CATEGORY | LOGGED_BY[ | NOTE]");
+    for (const t of detail) {
+      const cat = catById.get(t.category_id);
+      const adder = memberById.get(t.user_id);
+      const noteStr =
+        includeNotes && t.note?.trim()
+          ? ` | ${t.note.trim().slice(0, 80)}`
+          : "";
+      lines.push(
+        `${t.occurred_on} | ${t.type} | ${fmt(Number(t.amount))} | ${
+          cat?.name ?? "Uncategorised"
+        } | ${adder?.display_name ?? "?"}${noteStr}`
+      );
+    }
+  }
+
+  return { currency, text: lines.join("\n"), notesIncluded: includeNotes };
 }
 
 /** The system prompt that frames the assistant. */
 export function chatSystemPrompt(ctx: ChatContext): string {
   return `You are Duddify's friendly personal-finance coach.
 
-You are answering questions for the user about their own finances using ONLY the aggregated context below. You have NO access to individual transactions, notes, or receipts.
+You are answering questions for the user about their own finances using ONLY the context below. The context contains:
+  • Aggregated monthly / YTD / this-vs-last-month totals.
+  • Top expense categories rolled up over the last 6 months.
+  • A detailed list of individual transactions from the last 90 days
+    (date, amount, type, category, logged-by, ${ctx.notesIncluded ? "note" : "no note"}).
+
+What you can do:
+  • Sum, filter, and compare amounts across any category, date range, or
+    payer within the 90-day detail window.
+  • Cite specific dates and amounts when asked. For example "you spent
+    ₹450 on Cabs on 2026-05-09".
+  • For older periods (more than 90 days ago) you only have monthly
+    totals — say so when the user asks about specific older transactions.
 
 Style:
-- Keep answers concise (2-4 short sentences for simple questions).
-- Use the exact currency code the user provides (don't convert).
-- If the question can't be answered from the context, say so plainly and suggest what data you'd need.
-- Be honest about trends. If the user is overspending, say so kindly but clearly.
-- Never invent numbers. Only cite figures present in the context below.
+  • Keep answers concise (2–4 short sentences for simple questions; use
+    short bullet lists for breakdowns).
+  • Use the user's currency code as-is — never convert.
+  • Never invent numbers; only cite figures present in the context.
+  • If a question can't be answered from the context, say so plainly and
+    suggest what filter / time window would help.
 
 USER CONTEXT (auto-generated, refreshed every chat turn):
 ${ctx.text}`;
