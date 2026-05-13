@@ -49,37 +49,27 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{
             __html: `
               /*
-               * 2026-05-13 — Service Worker temporarily disabled while we
-               * recover from a caching outage. We still REGISTER /sw.js so
-               * existing PWAs pick up the killswitch SW (which unregisters
-               * itself + clears all caches), but we do not re-register any
-               * SW afterwards. Once we've verified the app is back up, this
-               * block will be reinstated with a safer SW design.
+               * 2026-05-13 — Service Worker disabled while we recover from
+               * a caching outage. We do NOT register a new SW. We DO
+               * proactively unregister any existing SW that the browser
+               * still has from a previous build, and we clear all Cache
+               * Storage entries. After this script runs the page serves
+               * straight from the network on every load.
                */
               (function () {
                 if (!('serviceWorker' in navigator)) return;
-                var refreshing = false;
-                navigator.serviceWorker.addEventListener('controllerchange', function () {
-                  if (refreshing) return;
-                  refreshing = true;
-                  window.location.reload();
-                });
-                // One-shot registration: triggers the killswitch SW for
-                // anyone who has the old one cached. After the killswitch
-                // unregisters, nothing else registers a SW — the page
-                // serves from the network on every load.
-                window.addEventListener('load', function () {
-                  navigator.serviceWorker.register('/sw.js').catch(function(){});
-                  // Also proactively unregister any leftover SWs that the
-                  // browser might still consider "controlling" — defence in
-                  // depth for browsers that don't honour the killswitch
-                  // self-unregister cleanly.
+                try {
                   navigator.serviceWorker.getRegistrations().then(function (regs) {
-                    setTimeout(function () {
-                      regs.forEach(function (r) { try { r.update(); } catch(e){} });
-                    }, 1500);
+                    regs.forEach(function (r) { try { r.unregister(); } catch(e){} });
                   }).catch(function(){});
-                });
+                } catch (e) {}
+                try {
+                  if ('caches' in window) {
+                    caches.keys().then(function (keys) {
+                      keys.forEach(function (k) { try { caches.delete(k); } catch(e){} });
+                    }).catch(function(){});
+                  }
+                } catch (e) {}
               })();
             `,
           }}
