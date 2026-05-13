@@ -105,7 +105,17 @@ export function StaggerItem({
   );
 }
 
-/** Smooth count-up of a number, formatted as currency. */
+/**
+ * Smooth count-up of a number, formatted as currency.
+ *
+ * Implementation: subscribe to the spring with useMotionValueEvent and push
+ * the formatted string into React state on every animation frame. Older
+ * versions of this component used `<motion.span>{motionValue}</motion.span>`
+ * which relied on motion's MotionValue-as-text-child behaviour — that
+ * broke silently in some motion versions and rendered as empty text,
+ * producing the "Net saved this month value is blank" bug. Using React
+ * state is slightly less efficient but always renders.
+ */
 export function AnimatedCurrency({
   value,
   currency = "INR",
@@ -117,19 +127,37 @@ export function AnimatedCurrency({
   locale?: string;
   className?: string;
 }) {
-  const mv = useMotionValue(0);
+  const reduceMotion = useReducedMotion();
+  const mv = useMotionValue(value);
   const spring = useSpring(mv, { stiffness: 110, damping: 22, mass: 0.8 });
-  const display = useTransform(spring, (v) => formatCurrency(Math.round(v), currency, locale));
+
+  const [text, setText] = React.useState(() =>
+    formatCurrency(Math.round(value), currency, locale)
+  );
 
   React.useEffect(() => {
-    mv.set(value);
-    return () => {
+    // Honour prefers-reduced-motion by snapping straight to the value.
+    if (reduceMotion) {
+      mv.jump(value);
+    } else {
       mv.set(value);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value]);
+    }
+    // Keep the displayed text in sync when currency/locale change too,
+    // independent of any spring activity.
+    setText(formatCurrency(Math.round(value), currency, locale));
+  }, [value, currency, locale, reduceMotion, mv]);
 
-  return <motion.span className={className}>{display}</motion.span>;
+  // Subscribe to the spring's frame updates and write the formatted value
+  // into React state. This guarantees the text node actually renders even
+  // if motion changes how it handles MotionValue children in the future.
+  React.useEffect(() => {
+    const unsub = spring.on("change", (v) => {
+      setText(formatCurrency(Math.round(v), currency, locale));
+    });
+    return () => unsub();
+  }, [spring, currency, locale]);
+
+  return <span className={className}>{text}</span>;
 }
 
 /** Smooth count-up for a percent or plain integer. */
@@ -142,15 +170,25 @@ export function AnimatedNumber({
   suffix?: string;
   className?: string;
 }) {
-  const mv = useMotionValue(0);
+  const reduceMotion = useReducedMotion();
+  const mv = useMotionValue(value);
   const spring = useSpring(mv, { stiffness: 110, damping: 22, mass: 0.8 });
-  const display = useTransform(spring, (v) => `${Math.round(v)}${suffix}`);
+  const [text, setText] = React.useState(() => `${Math.round(value)}${suffix}`);
 
   React.useEffect(() => {
-    mv.set(value);
-  }, [value, mv]);
+    if (reduceMotion) mv.jump(value);
+    else mv.set(value);
+    setText(`${Math.round(value)}${suffix}`);
+  }, [value, suffix, reduceMotion, mv]);
 
-  return <motion.span className={className}>{display}</motion.span>;
+  React.useEffect(() => {
+    const unsub = spring.on("change", (v) => {
+      setText(`${Math.round(v)}${suffix}`);
+    });
+    return () => unsub();
+  }, [spring, suffix]);
+
+  return <span className={className}>{text}</span>;
 }
 
 /** Card with hover-lift. */
